@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>创投模拟器 Demo</title>
+    <link rel="stylesheet" href="./styles.css?v=20260807-42" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="control-panel">
+        <div class="brand">
+          <span class="mark">ESCP X BH</span>
+          <div>
+            <h1>创投模拟器</h1>
+            <p id="brandSubtitle">融资预测 · 投资人匹配</p>
+          </div>
+        </div>
+
+        <section class="panel-section">
+          <div class="section-title">使用角色</div>
+          <div class="persona-switch" id="personaSwitch">
+            <button type="button" data-persona="startup" class="active">初创公司</button>
+            <button type="button" data-persona="investor">投资人</button>
+          </div>
+          <p class="panel-hint" id="personaHint">找下一轮资金、合适的投资人和关键资源。</p>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title" id="companyProfileTitle">公司信息</div>
+          <label>
+            区域
+            <select id="region">
+              <option value="china">中国</option>
+              <option value="overseas">海外</option>
+            </select>
+          </label>
+          <select id="industry" hidden aria-hidden="true"></select>
+          <label>
+            城市/地区
+            <select id="metro"></select>
+          </label>
+          <select id="stage" hidden aria-hidden="true"></select>
+          <small id="stageDetection" hidden></small>
+          <label id="targetCompanyField">
+            目标公司
+            <select id="company"></select>
+          </label>
+        </section>
+
+        <details class="panel-section panel-disclosure" id="companyConditions">
+          <summary class="section-title">调整预测条件</summary>
+          <div class="panel-disclosure-body">
+          <div class="team-grid" id="teamRoles"></div>
+          <div class="range-row">
+            <label for="employees">团队规模</label>
+            <output id="employeesOut">12</output>
+          </div>
+          <input id="employees" type="range" min="3" max="120" value="12" />
+          <div class="range-row">
+            <label for="runway">现金 runway（月）</label>
+            <output id="runwayOut">9</output>
+          </div>
+          <input id="runway" type="range" min="1" max="30" value="9" />
+          </div>
+        </details>
+
+        <details class="panel-section panel-disclosure" id="investorAssumptions" hidden>
+          <summary class="section-title">调整投资假设</summary>
+          <div class="panel-disclosure-body">
+          <div class="range-row">
+            <label for="ticketSize">拟投资金额（百万美元）</label>
+            <output id="ticketSizeOut">5</output>
+          </div>
+          <input id="ticketSize" type="range" min="1" max="100" value="5" />
+          <div class="range-row">
+            <label for="targetOwnership">目标持股比例</label>
+            <output id="targetOwnershipOut">10%</output>
+          </div>
+          <input id="targetOwnership" type="range" min="1" max="30" value="10" />
+          <p class="panel-hint">用于测算退出回款和投资回报倍数，不构成投资建议。</p>
+          </div>
+        </details>
+
+        <button id="simulateBtn" class="primary-button" type="button">重新生成</button>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar" id="workspaceTopbar">
+          <div>
+            <div class="eyebrow">融资决策台</div>
+            <h2 id="workspaceTitle">从当前关卡，预测下一轮与退出</h2>
+            <p id="workspaceSubtitle" hidden></p>
+          </div>
+          <div class="topbar-actions"><button class="pool-back-button" id="backToInvestorPool" type="button" hidden>← 返回项目池</button><div class="status-pill" id="dataStatus">加载数据中</div></div>
+        </header>
+
+        <section class="investor-pool" id="investorPool" hidden>
+          <header class="investor-pool-head">
+            <div><span>DEAL FLOW</span><h3>投资项目池</h3><p>像看行情一样筛选公司，再进入单个项目做估值与尽调。</p></div>
+            <label><span>搜索公司</span><input id="investorPoolSearch" type="search" placeholder="输入公司名称或阶段" /></label>
+          </header>
+          <div class="investor-pool-stats" id="investorPoolStats"></div>
+          <div class="pool-market-bar" id="investorPoolSegments">
+            <div><button class="active" type="button" data-pool-segment="all">全部项目</button><button type="button" data-pool-segment="strong">高续融</button><button type="button" data-pool-segment="predictable">可预测</button><button type="button" data-pool-segment="exited">已退出</button></div>
+            <span><i></i>数据与模型结果已更新</span>
+          </div>
+          <div class="investor-pool-table-wrap">
+            <table class="investor-pool-table">
+              <thead><tr>
+                <th class="pool-rank-head">排名</th>
+                <th><button type="button" data-pool-sort="company">公司 / 阶段</button></th>
+                <th><button type="button" data-pool-sort="probability">续融概率</button></th>
+                <th class="pool-trend-head">融资趋势</th>
+                <th><button type="button" data-pool-sort="date">预计时间</button></th>
+                <th><button type="button" data-pool-sort="amount">下一轮金额</button></th>
+                <th><button type="button" data-pool-sort="valuation">估值参考</button></th>
+                <th><button type="button" data-pool-sort="exit">退出概率</button></th>
+                <th><button type="button" data-pool-sort="risk">风险</button></th>
+                <th></th>
+              </tr></thead>
+              <tbody id="investorPoolBody"></tbody>
+            </table>
+          </div>
+          <div class="investor-pool-empty" id="investorPoolEmpty" hidden>没有符合当前地区条件的公司</div>
+        </section>
+
+        <nav class="workspace-tabs" id="workspaceTabs" aria-label="工作区导航">
+          <button class="active" type="button" data-view="decision"><span>01</span><strong>投资判断</strong><small>融资 · 估值 · 退出</small></button>
+          <button type="button" data-view="company"><span>02</span><strong>公司评估</strong><small>财务 · 风险 · 关系</small></button>
+          <button type="button" data-view="resources"><span>03</span><strong>融资执行</strong><small>投资人 · 合作资源</small></button>
+        </nav>
+
+        <div class="workspace-view active" id="decisionView"></div>
+        <div class="workspace-view" id="companyView" hidden></div>
+        <div class="workspace-view" id="resourcesView" hidden></div>
+
+        <section class="decision-guide" id="decisionGuide">
+          <div class="decision-steps" id="decisionSteps" hidden></div>
+          <div class="decision-summary">
+            <span id="summaryKicker">核心结论</span>
+            <strong id="summaryTitle">正在计算公司融资路径</strong>
+            <div class="company-overview-meta" id="companyOverviewMeta"></div>
+            <p id="summaryText" hidden></p>
+          </div>
+        </section>
+
+        <section class="journey-module" id="journeyModule">
+          <div class="module-head">
+            <div>
+              <h3 id="journeyTitle">融资进程与退出</h3>
+              <p class="module-subtitle" id="journeyMethod">先看五个核心结论，再沿主曲线区分左侧历史事实与右侧未来预测。</p>
+            </div>
+            <span id="journeyConfidence">样本计算中</span>
+          </div>
+          <div class="journey-kpis" id="journeyKpis"></div>
+          <details class="model-tree-panel" id="modelTreePanel">
+            <summary><div><strong>随机森林决策解释</strong><span>森林投票、特征贡献与代表树路径</span></div><small id="modelTreeSummary">模型结构</small></summary>
+            <div class="model-tree-body">
+              <div class="model-tree-intro" id="modelTreeIntro"></div>
+              <div class="model-tree-dashboard" id="modelTreeDashboard"></div>
+              <div class="model-tree-path" id="modelTreePath"></div>
+              <div class="model-tree-scroll" id="modelTree"></div>
+              <div class="model-tree-node-detail" id="modelTreeNodeDetail"></div>
+            </div>
+          </details>
+          <section class="forecast-matrix" id="forecastMatrix">
+            <div class="forecast-table-wrap">
+              <table class="forecast-table">
+                <thead><tr><th>融资轮次</th><th>记录性质</th><th>到达概率</th><th>时间</th><th>融资金额</th><th>估值/股权价值</th></tr></thead>
+                <tbody id="forecastTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+          <div class="exit-outcomes" id="exitOutcomes" hidden></div>
+          <div class="funding-curve-wrap">
+            <div class="funding-curve-head">
+              <div>
+                <strong>全周期融资路径曲线</strong>
+                <span id="curveSubtitle">历史优先使用估值，缺失时参考融资金额</span>
+              </div>
+              <div class="curve-legend">
+                <span><i class="curve-history-key"></i>已知事实</span>
+                <span id="curveForecastLegend"><i class="curve-forecast-key"></i>未来预测</span>
+                <span><i class="curve-exit-key"></i>退出价值参考</span>
+              </div>
+            </div>
+            <div class="funding-curve" id="fundingCurve"></div>
+            <details class="historical-finance" id="historicalFinance">
+              <summary class="historical-finance-head">
+                <strong>历史融资明细</strong>
+                <span>按日期查看事件、金额与投资机构</span>
+              </summary>
+              <div id="historicalFinanceEvents" class="historical-finance-events"></div>
+            </details>
+          </div>
+          <details class="secondary-analysis" open>
+            <summary><strong>融资与历史明细</strong></summary>
+            <div class="secondary-analysis-body" id="secondaryAnalysisBody"></div>
+          </details>
+          <div id="journeyNote" hidden></div>
+        </section>
+
+        <section class="decision-priorities" id="decisionPriorities">
+          <header><div><span id="priorityKicker">融资准备</span><h3 id="priorityTitle">本轮融资待办</h3></div><strong id="priorityScore">评估中</strong></header>
+          <div class="priority-summary" id="prioritySummary"></div>
+          <div class="priority-grid" id="priorityGrid"></div>
+        </section>
+
+        <section class="company-assistant" id="companyAssistant">
+          <div class="company-assistant-head">
+            <div><span>AI 助手</span><strong>问当前公司的融资、财务与风险</strong></div>
+            <small id="assistantStatus">正在检查 API 连接</small>
+          </div>
+          <div class="company-assistant-layout">
+            <div class="assistant-conversation">
+              <div class="assistant-messages" id="assistantMessages" aria-live="polite"></div>
+              <form class="assistant-composer" id="assistantForm">
+                <input id="assistantInput" type="text" maxlength="200" autocomplete="off" placeholder="例如：这家公司下一轮能融多少钱？" />
+                <button type="submit">发送</button>
+              </form>
+            </div>
+            <div class="assistant-prompts" id="assistantPrompts">
+              <span>常用问题</span>
+              <button type="button" data-assistant-question="下一轮融资概率和时间是多少？">下一轮融资</button>
+              <button type="button" data-assistant-question="公司的估值是怎么得到的？">估值依据</button>
+              <button type="button" data-assistant-question="这家公司有没有上市？IPO概率怎么看？">上市与退出</button>
+              <button type="button" data-assistant-question="有哪些需要关注的风险？">风险记录</button>
+              <button type="button" data-assistant-question="财务数据怎么样？">财务情况</button>
+              <button type="button" data-assistant-question="团队和股东情况怎么样？">团队与股东</button>
+            </div>
+          </div>
+        </section>
+
+        <details class="company-dossier" id="companyDossier">
+          <summary>
+            <div><strong id="dossierTitle">公司完整决策档案</strong><span id="dossierSubtitle">工商、财务、风险、人员与上市信息</span></div>
+          </summary>
+          <div class="dossier-grid" id="dossierGrid"></div>
+        </details>
+
+        <section class="valuation-hero" id="valuationModule" hidden>
+          <div class="valuation-main">
+            <div class="module-head">
+              <div>
+                <h3>公司估值预测</h3>
+                <p id="valuationSource" class="module-subtitle">等待样本匹配</p>
+              </div>
+              <div class="head-actions">
+                <span id="valuationConfidence">样本数 -</span>
+                <button id="valuationTimelineBtn" class="ghost-button" type="button" hidden>估值曲线</button>
+              </div>
+            </div>
+            <div class="valuation-number" id="valuationMedian">-</div>
+            <div class="valuation-range" id="valuationRange"></div>
+            <div class="valuation-bars" id="valuationBars"></div>
+            <details class="text-disclosure valuation-method"><summary>查看估值方法</summary><p class="formula" id="valuationFormula"></p></details>
+          </div>
+
+          <div class="action-card" id="valuationAction"></div>
+        </section>
+
+        <section class="investor-finance-panel" id="investorFinancePanel" hidden>
+          <div class="module-head">
+            <div>
+              <h3>投资回报测算</h3>
+              <p class="module-subtitle">结合融资成功率、估值、投资金额和持股比例测算。</p>
+            </div>
+            <span>投资人视角</span>
+          </div>
+          <div class="finance-metric-grid" id="financeMetricGrid"></div>
+          <details class="text-disclosure"><summary>查看计算公式</summary><div class="finance-formula" id="financeFormula"></div></details>
+        </section>
+
+        <section class="network-module" id="networkModule">
+          <header class="network-head">
+            <div><span>关系网络</span><strong>公司知识图谱</strong></div>
+            <nav class="network-filters" id="networkFilters" aria-label="图谱筛选">
+              <button class="active" type="button" data-network-filter="all">全部</button>
+              <button type="button" data-network-filter="finance">融资</button>
+              <button type="button" data-network-filter="investor">投资机构</button>
+              <button type="button" data-network-filter="person">人员</button>
+              <button type="button" data-network-filter="shareholder">股东</button>
+              <button type="button" data-network-filter="risk">风险</button>
+            </nav>
+          </header>
+          <div class="network-stats" id="networkGrid"></div>
+          <div class="knowledge-graph-layout">
+            <div class="knowledge-graph-main">
+              <div class="network-tools">
+                <label><span>搜索节点</span><input id="networkSearch" type="search" placeholder="机构、轮次或职务" /></label>
+                <div id="networkControls">
+                  <button type="button" data-network-action="zoom-in" aria-label="放大">＋</button>
+                  <button type="button" data-network-action="zoom-out" aria-label="缩小">−</button>
+                  <button type="button" data-network-action="fit">居中</button>
+                  <button type="button" data-network-action="layout">重排</button>
+                  <button type="button" data-network-action="round-only">仅看本轮</button>
+                  <button type="button" data-network-action="fullscreen">全屏</button>
+                </div>
+              </div>
+              <div class="knowledge-graph-canvas" id="networkGraph"></div>
+              <div class="network-legend"><span><i class="company"></i>公司</span><span><i class="finance"></i>融资轮次</span><span><i class="investor"></i>投资机构</span><span><i class="portfolio"></i>关联项目</span><span><i class="coinvestor"></i>共同投资机构</span><span><i class="person"></i>人员职务</span><span><i class="shareholder"></i>股东</span><span><i class="risk"></i>风险事件</span></div>
+            </div>
+            <aside class="network-detail" id="networkDetail"></aside>
+          </div>
+        </section>
+
+        <section class="match-details" id="matchModule">
+          <header class="match-summary"><div><strong id="matchTitle">投资人匹配</strong><span id="matchSubtitle">根据历史投资记录筛选</span></div></header>
+          <section class="match-grid">
+          <div class="module">
+            <div class="module-head">
+              <div>
+                <h3 id="investorModuleTitle">找投资人</h3>
+                <p class="module-subtitle">按地区、行业、阶段偏好和历史投资活跃度排序。</p>
+              </div>
+              <span id="investorMeta">-</span>
+            </div>
+            <div id="investorMatches" class="card-list"></div>
+          </div>
+          </section>
+        </section>
+
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="valuationTimelineModal" hidden>
+      <section class="timeline-modal" role="dialog" aria-modal="true" aria-labelledby="timelineTitle">
+        <div class="modal-head">
+          <div>
+            <span>公司估值时间线</span>
+            <h3 id="timelineTitle">估值曲线</h3>
+            <p id="timelineSubtitle">历史来自已有数据，未来来自趋势预测。</p>
+          </div>
+          <button id="timelineCloseBtn" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <div id="timelineChart" class="timeline-chart"></div>
+        <div id="timelineLegend" class="timeline-legend"></div>
+        <div id="timelineEvents" class="timeline-events"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="profileModal" hidden>
+      <section class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+        <div class="modal-head">
+          <div>
+            <span id="profileKicker">推荐画像</span>
+            <h3 id="profileTitle">画像详情</h3>
+            <p id="profileSubtitle">基于当前公司条件和 demo 样本生成。</p>
+          </div>
+          <button id="profileCloseBtn" class="icon-button" type="button" aria-label="关闭">×</button>
+        </div>
+        <section class="profile-match" id="profileMatch"></section>
+        <div class="profile-hero">
+          <div>
+            <span id="profileScoreLabel">历史投资</span>
+            <strong id="profileScore">-</strong>
+          </div>
+          <div id="profileTags" class="profile-tags"></div>
+        </div>
+        <div id="profileStats" class="profile-stats"></div>
+        <div id="profileBody" class="profile-body"></div>
+        <div id="profileActions" class="profile-actions"></div>
+      </section>
+    </div>
+
+    <div class="page-loading" id="pageLoading" hidden aria-live="polite" aria-busy="true">
+      <div class="loading-panel">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <strong>正在切换数据</strong>
+        <p>正在更新公司估值与投资人匹配...</p>
+      </div>
+    </div>
+
+    <script src="./data.js?v=20260806-4"></script>
+    <script src="./model_outputs.js"></script>
+    <script src="./valuation_model_outputs.js"></script>
+    <script src="./venture_model_predictions.js"></script>
+    <script src="./random_forest_tree.js?v=20260806-2"></script>
+    <script src="https://unpkg.com/cytoscape@3.33.1/dist/cytoscape.min.js"></script>
+    <script src="./app.js?v=20260807-49"></script>
+  </body>
+</html>

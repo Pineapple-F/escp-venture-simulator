@@ -1,0 +1,1 @@
+window.ESCP_VALUATION_MODEL_RESULTS = {"patchtst_valuation":[{"generated_at":"2026-06-03T20:05:19","dataset":"overseas","model":"PatchTST","target":"valuation_median","seq_len":"24","pred_len":"3","mse":"2.3413894176483154","mae":"1.0023177862167358","rse":"1.0928024053573608"}]};
