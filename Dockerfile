@@ -13,7 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY demo ./demo
 COPY scripts ./scripts
 COPY processed ./processed
-COPY external ./external
 
 EXPOSE 8080
 
