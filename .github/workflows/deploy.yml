@@ -20,3 +20,7 @@ jobs:
           wranglerVersion: "4.25.0"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            DEEPSEEK_KEY
+        env:
+          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}

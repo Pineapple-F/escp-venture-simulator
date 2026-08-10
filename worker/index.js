@@ -32,75 +32,54 @@ async function loadMetrics(env, request) {
   }
 }
 
-function extractGeminiText(result) {
-  const texts = [];
-  const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
-  for (const candidate of candidates) {
-    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
-    for (const part of parts) {
-      if (part && typeof part.text === "string" && part.text) texts.push(part.text);
-    }
-  }
-  return texts.join("\n").trim();
-}
-
 const SYSTEM_INSTRUCTION =
   "你是创投与公司金融分析助手。只根据用户提供的当前公司数据回答，使用简洁、专业、易懂的中文。" +
   "必须区分历史事实、模型预测和缺失数据；不得把未披露写成零，不得虚构公司、人员、金额或概率。" +
   "涉及预测时说明概率、时间和金额口径；涉及IPO或并购时明确这是事实还是参考概率。" +
   "答案控制在250字内，不作收益承诺，并在数据不足时直接说明需要补充什么。";
 
-async function askGemini(payload, env) {
-  const apiKey = (env.GEMINI_API_KEY || "").trim();
-  if (!apiKey) return jsonResponse({ ok: false, error: "服务器尚未配置 GEMINI_API_KEY" }, 503);
+async function askDeepSeek(payload, env) {
+  const apiKey = (env.DEEPSEEK_KEY || "").trim();
+  if (!apiKey) return jsonResponse({ ok: false, error: "服务器尚未配置 DEEPSEEK_KEY" }, 503);
 
   const question = String(payload?.question ?? "").trim();
   if (!question) return jsonResponse({ ok: false, error: "问题不能为空" }, 502);
   if (question.length > 500) return jsonResponse({ ok: false, error: "问题不能超过 500 个字符" }, 502);
 
-  const model = env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = env.DEEPSEEK_MODEL || "deepseek-chat";
   const context = payload?.context && typeof payload.context === "object" && !Array.isArray(payload.context) ? payload.context : {};
   const history = Array.isArray(payload?.history) ? payload.history : [];
   const safeHistory = history
     .slice(-6)
     .filter((item) => item && typeof item === "object" && (item.role === "user" || item.role === "assistant"));
-  const contents = safeHistory.map((item) => ({
-    role: item.role === "assistant" ? "model" : "user",
-    parts: [{ text: String(item.content ?? "").slice(0, 1200) }],
-  }));
-  contents.push({
+  const messages = [{ role: "system", content: SYSTEM_INSTRUCTION }];
+  for (const item of safeHistory) {
+    messages.push({ role: item.role, content: String(item.content ?? "").slice(0, 1200) });
+  }
+  messages.push({
     role: "user",
-    parts: [{ text: `当前公司数据：\n${JSON.stringify(context)}\n\n用户问题：${question}` }],
+    content: `当前公司数据：\n${JSON.stringify(context)}\n\n用户问题：${question}`,
   });
-
-  const requestBody = {
-    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-    contents,
-    generationConfig: { maxOutputTokens: 2048 },
-  };
 
   let result;
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      },
-    );
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages, max_tokens: 2048 }),
+    });
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500);
-      return jsonResponse({ ok: false, error: `Gemini API 请求失败（HTTP ${response.status}）：${detail}` }, 502);
+      return jsonResponse({ ok: false, error: `DeepSeek API 请求失败（HTTP ${response.status}）：${detail}` }, 502);
     }
     result = await response.json();
   } catch (_error) {
-    return jsonResponse({ ok: false, error: "无法连接 Gemini API，请检查服务器网络" }, 502);
+    return jsonResponse({ ok: false, error: "无法连接 DeepSeek API，请检查服务器网络" }, 502);
   }
 
-  const answer = extractGeminiText(result);
-  if (!answer) return jsonResponse({ ok: false, error: "Gemini API 未返回可用文本" }, 502);
-  return jsonResponse({ ok: true, answer, model, provider: "Gemini" });
+  const answer = String(result?.choices?.[0]?.message?.content ?? "").trim();
+  if (!answer) return jsonResponse({ ok: false, error: "DeepSeek API 未返回可用文本" }, 502);
+  return jsonResponse({ ok: true, answer, model, provider: "DeepSeek" });
 }
 
 export default {
@@ -113,9 +92,9 @@ export default {
         mode: STATUS_MODE,
         metrics: await loadMetrics(env, request),
         ai: {
-          configured: Boolean((env.GEMINI_API_KEY || "").trim()),
-          model: env.GEMINI_MODEL || "gemini-3.6-flash",
-          provider: "Gemini",
+          configured: Boolean((env.DEEPSEEK_KEY || "").trim()),
+          model: env.DEEPSEEK_MODEL || "deepseek-chat",
+          provider: "DeepSeek",
         },
       });
     }
@@ -129,7 +108,7 @@ export default {
       } catch (_error) {
         payload = {};
       }
-      return askGemini(payload, env);
+      return askDeepSeek(payload, env);
     }
 
     return env.ASSETS.fetch(request);

@@ -2390,7 +2390,7 @@ async function submitAssistantQuestion(question) {
     const answer = result.answer;
     appendAssistantMessage("assistant", answer);
     state.assistantHistory.push({ role: "assistant", content: answer });
-    els.assistantStatus.textContent = `${result.model || "Gemini"} 已连接`;
+    els.assistantStatus.textContent = `${result.model || "DeepSeek"} 已连接`;
   } catch (error) {
     const fallback = `API 暂不可用：${error.message}。\n\n本地数据回答：${assistantAnswer(cleanQuestion)}`;
     appendAssistantMessage("assistant", fallback);
@@ -2406,7 +2406,7 @@ async function checkAssistantApi() {
   try {
     const response = await fetch("/api/status");
     const result = await response.json();
-    els.assistantStatus.textContent = result.ai?.configured ? `${result.ai.model} 已连接` : "等待配置免费 Gemini API Key";
+    els.assistantStatus.textContent = result.ai?.configured ? `${result.ai.model} 已连接` : "等待配置 DeepSeek API Key";
   } catch (_error) {
     els.assistantStatus.textContent = "后端未启动 · 使用本地回答";
   }
