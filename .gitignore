@@ -5,6 +5,9 @@ __pycache__/
 *.py[cod]
 *.log
 .pytest_cache/
+public/
+node_modules/
+.wrangler/
 .idea/
 .vscode/
 edge-profile/

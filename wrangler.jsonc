@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "escp-venture-simulator",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "routes": [
+    {
+      "pattern": "venturesimulator.actscal.org",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "GEMINI_MODEL": "gemini-3.6-flash"
+  }
+}
