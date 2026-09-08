@@ -7,6 +7,12 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "migrations": [
+    {
+      "tag": "v2",
+      "deleted_classes": ["VentureSimulator"]
+    }
+  ],
   "routes": [
     {
       "pattern": "venturesimulator.actscal.org",
