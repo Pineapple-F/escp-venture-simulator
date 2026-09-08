@@ -1,7 +1,0 @@
-{
-  "name": "escp-venture-simulator",
-  "private": true,
-  "dependencies": {
-    "@cloudflare/containers": "^0.3.7"
-  }
-}

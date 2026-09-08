@@ -147,6 +147,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__=='__main__':
     port=int(os.environ.get('MARKET_PORT','8790'))
-    host=os.environ.get('MARKET_HOST','127.0.0.1')
-    print(f'Market simulator: http://{host}:{port}',flush=True)
-    ThreadingHTTPServer((host,port),Handler).serve_forever()
+    print(f'Market simulator: http://127.0.0.1:{port}',flush=True)
+    ThreadingHTTPServer(('127.0.0.1',port),Handler).serve_forever()

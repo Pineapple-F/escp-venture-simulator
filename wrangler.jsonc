@@ -2,33 +2,18 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "escp-venture-simulator",
   "main": "worker/index.js",
-  "compatibility_date": "2026-09-08",
-  "containers": [
-    {
-      "class_name": "VentureSimulator",
-      "image": "./Dockerfile",
-      "max_instances": 1,
-      "instance_type": "lite"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "VENTURE_SIMULATOR",
-        "class_name": "VentureSimulator"
-      }
-    ]
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["VentureSimulator"]
-    }
-  ],
   "routes": [
     {
       "pattern": "venturesimulator.actscal.org",
       "custom_domain": true
     }
-  ]
+  ],
+  "vars": {
+    "DEEPSEEK_MODEL": "deepseek-chat"
+  }
 }
