@@ -11,16 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build static assets
-        run: bash scripts/build_site.sh
+      - name: Install Worker dependencies
+        run: npm install --no-audit --no-fund
 
-      - name: Deploy Worker
+      - name: Deploy simulator 2.0
         uses: cloudflare/wrangler-action@v3
         with:
-          wranglerVersion: "4.25.0"
+          wranglerVersion: "4.69.0"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets: |
-            DEEPSEEK_KEY
-        env:
-          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
