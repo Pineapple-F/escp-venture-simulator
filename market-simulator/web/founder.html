@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>长线 · 企业融资</title><link rel="stylesheet" href="/founder.css"></head>
+<body>
+<aside class="founder-sidebar"><a class="brand" href="/founder">↗ <b>长线</b></a><div class="sidebar-company"><span>企业工作台</span><strong id="sidebarCompany">选择企业后开始</strong></div><nav id="companySections" aria-label="企业功能"><button data-section="finance" disabled>融资工作台</button><button data-section="overview" class="secondary" disabled>企业概况</button><button data-section="past" class="secondary" disabled>历史融资</button></nav><div class="sidebar-footer"><a href="/">投资人端 →</a></div></aside>
+<header class="top"><span><i class="founder-dot"></i> 企业端</span><span>历史资料 · 独立模拟</span></header>
+<main>
+  <section id="entry" hidden><h1>为下一轮融资找到方向</h1><p>选择一家历史企业模拟经营，找有相关投资经历的机构，整理接触名单。</p><button id="start">选择企业，开始准备 →</button></section>
+  <section id="workspace" hidden>
+    <div class="heading"><div><p class="eyebrow">融资准备</p><h1 id="companyName">选择企业</h1><p id="companyMeta"></p></div><button id="change" class="secondary">选择企业</button></div>
+    <section id="picker" class="panel"><label for="search">查找企业</label><input id="search" type="search" placeholder="企业名称、行业或地区"><p id="searchCount" class="muted"></p><div id="results"></div><div class="pages"><button id="prev" class="secondary">上一页</button><span id="page"></span><button id="next" class="secondary">下一页</button></div></section>
+    <div id="details" hidden>
+      <section id="overviewSection" hidden><div class="panel"><h2>企业信息</h2><div id="companyProfile"></div><p id="profileNote" class="muted"></p></div><div class="panel"><h2>主要人员</h2><p class="muted">展示已收录的董监高等任职记录，不是员工总数。</p><div id="officers"></div></div><div class="panel"><h2>风险记录</h2><div id="overviewRisks"></div></div></section>
+      <section id="pastSection" hidden><div class="panel"><h2>历史融资</h2><div id="pastFunding"></div></div><div class="panel"><h2>同行参考</h2><div id="pastPeers"></div></div></section>
+      <section id="financeSection">
+      <nav class="actions" id="tabs" aria-label="融资工作区"><button data-tab="find">找机构</button><button data-tab="contacts" class="secondary">本轮融资</button><button data-tab="plan" class="secondary">融资方案</button></nav>
+      <section id="findPanel" class="panel"><h2>机构 / 投资人池</h2><p class="muted">历史投资记录，截至 2026-03-31；匿名资料，不代表当前投资意愿。</p><div class="pool-filters"><input id="institutionSearch" type="search" placeholder="搜索机构 / 投资人" aria-label="搜索机构或投资人"><select id="institutionScope" aria-label="投资经历筛选"><option value="all">全部机构 / 投资人</option><option value="industry">投过同业企业</option><option value="stage">投过同业同阶段</option></select><select id="institutionSort" aria-label="机构排序"><option value="match">相关经历优先</option><option value="recent">最近披露优先</option><option value="count">投资企业数优先</option></select></div><p id="institutionCount" class="muted" role="status"></p><div id="institutions" class="institution-grid"></div><div class="pages"><button id="institutionPrev" class="secondary">上一页</button><span id="institutionPage"></span><button id="institutionNext" class="secondary">下一页</button></div></section>
+      <section id="contactsPanel" class="panel" hidden><h2>本轮融资</h2><p class="muted">提交 → 推进一周看反馈 → 确认条款 → 下周到账</p><div id="financingSummary"></div><button id="financingWeek" type="button">推进一周 →</button><details><summary>模拟规则</summary><p>同业历史经历支持进入评审；用途预算与目标一致、月净消耗完整且资金可用期不异常后进入情景条款讨论；只核对数值一致性，不代表真实尽调。金额和估值采用你提出的情景假设，不代表真实机构报价。接受后下周模拟到账，不计算经营收支。股权以原股东整体为基准，未还原真实股东结构；同轮按固定价格发行。</p><p>首次提交后锁定本轮币种、融资目标、估值与现金基准。可补材料、调整单家申请金额或换机构，不自动发送任何真实消息。</p></details><div id="contacts"></div><details><summary>融资记录</summary><div id="financingLedger"></div></details></section>
+      <div id="planPanel" hidden>
+      <div class="facts"><div><span>最近融资阶段</span><strong id="stage"></strong></div><div><span>历史融资</span><strong id="funding"></strong></div><div><span>经营异常记录</span><strong id="risk"></strong></div></div>
+      <p id="cutoff" class="muted"></p>
+      <div class="columns">
+        <form id="planForm" class="panel"><h2>融资计划</h2><p class="muted">以下为你填写的经营数据，不改写历史资料。</p>
+          <label>计划币种<select name="currency"><option value="CNY">人民币 CNY</option><option value="USD">美元 USD</option></select></label>
+          <div class="fields"><label>可用现金<input name="cash" type="number" min="0" max="1000000000000" step="0.01" placeholder="未填写"></label><label>月净现金消耗<input name="burn" type="number" min="0" max="1000000000000" step="0.01" placeholder="未填写"></label></div>
+          <label>目标融资金额<input name="target" type="number" min="0" max="1000000000000" step="0.01" placeholder="未填写"></label>
+          <label>期望投前估值（情景参数）<input name="pre_money" type="number" min="0.01" max="1000000000000" step="0.01" placeholder="填写本轮情景假设"></label><p class="muted">用于模拟股权计算，不是数据披露估值或市场报价。</p>
+          <label>希望覆盖的月数<input name="months" type="number" min="1" max="120" step="1" value="18"></label><p id="gap" class="muted"></p>
+          <label>资金用途<textarea name="purpose" maxlength="1200" rows="3" placeholder="例如产品研发、团队招聘及预计使用周期"></textarea></label>
+<fieldset><legend>本轮融资用途预算（与计划币种一致）</legend><div class="fields"><label>研发<input name="budget_research" type="number" min="0" step="0.01" placeholder="0"></label><label>招聘<input name="budget_hiring" type="number" min="0" step="0.01" placeholder="0"></label><label>市场<input name="budget_marketing" type="number" min="0" step="0.01" placeholder="0"></label><label>其他<input name="budget_other" type="number" min="0" step="0.01" placeholder="0"></label></div><p class="muted">各项是融资资金的分配，不与月净消耗重复相加。</p></fieldset>
+          <div class="actions"><button id="save" type="submit">保存计划</button><span id="saveStatus" role="status"></span></div>
+        </form>
+        <aside><section class="panel"><h2>方案核对</h2><strong id="runway" class="large">待填写现金数据</strong><p id="runwayNote" class="muted"></p><h3 id="materialCount"></h3><ul id="priorities"></ul><button id="export" class="secondary">导出准备清单 ↓</button></section>
+          <details class="panel"><summary>历史资料与风险</summary><div id="history"></div></details>
+          <details class="panel"><summary>同行融资参考</summary><div id="peers"></div></details>
+        </aside>
+      </div>
+      </div>
+      </section>
+    </div>
+  </section>
+  <p id="status" role="status">正在读取资料…</p>
+</main><dialog id="investorDialog" aria-labelledby="investorTitle"><button id="investorClose" class="secondary" aria-label="关闭投资人详情">关闭 ×</button><h2 id="investorTitle">投资人详情</h2><p id="investorSummary" class="muted"></p><p class="muted">金额为整轮融资总额，不代表该投资人的出资额。</p><div id="investorCases"></div><div class="pages"><button id="investorPrev" class="secondary">上一页</button><span id="investorPage"></span><button id="investorNext" class="secondary">下一页</button></div></dialog><script src="/founder.js"></script>
+</body></html>

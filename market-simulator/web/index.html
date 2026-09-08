@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>长线 · 历史融资市场</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23202a2d'/%3E%3C/svg%3E"><link rel="stylesheet" href="/styles.css"></head>
+<body>
+<div id="loading">正在读取融资资料…</div>
+<section id="welcome" hidden>
+  <header class="landing-nav"><a class="brand" href="/">↗ <b>长线</b><span>历史融资市场</span></a><a href="/founder">企业端 →</a></header>
+  <div class="landing-body">
+    <div><p class="eyebrow">企业融资 / 历史数据 / 资金配置</p><h1>在真实融资记录中，<br>观察资本的流向。</h1>
+      <p class="intro">以2019年末为观察起点，逐月查看企业融资与经营异常记录。建立假设投资组合，追踪后续披露，而不是生成一条虚构的市场走势。</p>
+      <div class="start-brief"><h2>资料与配置分开记录</h2><p>企业资料直接可查。选择当月披露的股权融资，可以记录假设认购；配置不会改变历史。投资成本、可用现金与参考估值分别列示。</p><p>数据未披露的估值、资本结构或退出价格保持缺失，不将融资金额当作估值，也不自动推算盈利。</p></div>
+      <div class="landing-stats"><div><b>120</b><span>家起点时已知企业</span></div><div><b>2019—2022</b><span>历史观察区间</span></div></div>
+      <p class="source-note" id="sourceSummary"></p>
+    </div>
+    <form id="newForm"><span class="form-number">配置账户参数</span><h2>建立观察账户</h2>
+      <p id="legacyNotice" class="expiry-warning" hidden>旧版随机模拟存档已保留，不会换算成历史组合。可先<a href="/api/legacy-export" download="legacy-simulation.json">下载旧记录</a>，再建立新账户。</p>
+      <label>账户名称<input name="name" maxlength="30" value="远航资本" required></label>
+      <label>记账币种<select name="currency"><option value="CNY">人民币 CNY</option><option value="USD">美元 USD</option></select></label>
+      <label>初始资金<input name="initial" type="number" min="1000" max="1000000000000" step="0.01" value="100000000" required></label>
+      <details><summary>费用假设</summary><label>年管理费率（%）<input name="fee" type="number" min="0" max="10" step="0.01" value="0" required></label><p class="tour-note">默认不计费。若设置，按初始资金 × 年费率 ÷ 12逐月计提；这是账户假设，不是数据提供的真实费率。</p></details>
+      <p class="tour-note">仅配置同币种融资，不自动换汇。观察期为2019年12月至2022年12月，不设胜负目标。</p>
+      <button class="primary" type="submit">进入工作台 →</button><button id="resume" type="button" hidden>返回当前账户</button>
+    </form>
+  </div><footer>历史记录不等于可执行报价。假设配置不是实际交易，成本口径资产不代表公允价值。</footer>
+</section>
+<div id="game" hidden>
+  <aside class="sidebar"><a class="brand" href="/">↗ <b>长线</b></a><div class="fund-label">观察账户<strong id="fundName"></strong></div>
+    <nav aria-label="主导航"><button data-view="market" class="active">融资市场</button><button data-view="portfolio">投资组合</button><button data-view="journal">账户记录</button></nav>
+    <div class="sidebar-bottom"><a href="/founder" style="color:inherit;font-size:18px">企业端 →</a><button id="rulesBtn">数据说明</button><button id="newBtn">新建账户</button></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div><span class="live-dot"></span><b id="date"></b><span id="regime">信息截止日</span></div><div class="top-actions"><span id="currencyLabel"></span><button id="advance" class="primary">查看下月资料 →</button></div></header>
+    <div class="account"><div><span>成本口径净资产 <small>非市场估值</small></span><strong id="nav"></strong></div><div><span>可用现金</span><strong id="cash"></strong></div><div><span>累计配置成本</span><strong id="cost"></strong></div><div><span>已计提管理费</span><strong id="fees"></strong></div></div>
+    <p class="workspace-note">选择企业 → 投资报价 → 成交入仓。报价与持股为模拟值。</p>
+    <div id="endBanner" hidden>已到达2022年12月的资料区间末。可继续查看组合及导出记录；不进行自动变现或收益排名。</div>
+    <div class="main-grid"><main>
+      <section id="marketView"><div class="section-heading"><div><p class="eyebrow">样本融资活动 / 非全市场统计</p><h1>融资市场</h1></div><span id="marketCount"></span></div>
+        <div class="market-pulse"><div><span id="pulseTitle"></span><p id="pulseCopy"></p></div><svg id="marketTrend" viewBox="0 0 260 70" aria-label="截至当前月份的样本融资记录数量"><path/></svg></div>
+        <div class="filters"><div><button data-filter="all" class="active">全部企业</button><button data-filter="current">本月融资</button><button data-filter="held">已持有</button></div><input id="search" placeholder="搜索企业" aria-label="搜索企业"></div>
+        <div class="market-selects"><select id="industryFilter" aria-label="行业"><option value="">全部行业</option></select><select id="stageFilter" aria-label="融资阶段"><option value="">全部融资阶段</option></select><select id="riskFilter" aria-label="风险记录"><option value="">全部风险记录</option><option>存在异常记录</option><option>异常已移出</option><option>未收录异常</option></select></div>
+        <div class="table-scroll"><table><thead><tr><th>企业 / 最近轮次</th><th>披露融资额</th><th>记录可见日</th><th>数据状态</th><th></th></tr></thead><tbody id="marketRows"></tbody></table></div>
+        <div class="pagination"><span id="pageLabel"></span><button id="prevPage">上一页</button><button id="nextPage">下一页</button></div>
+        <p class="table-note">“可见日”取事件日与有效披露日的较晚者；缺少披露日时以事件日代替并标注，不能保证当时已公开。金额不是公司估值。M＝百万，K＝千；不同币种不合计。</p>
+      </section>
+      <section id="portfolioView" hidden><div class="section-heading"><div><p class="eyebrow">成本记录 / 未进行公允价值评估</p><h1>投资组合</h1></div></div>
+        <div class="performance"><header><b>资金构成</b><span>实线：可用现金　虚线：累计配置成本</span></header><div id="chart"></div><p>融资额不能直接推导股权价值。本页不生成净值涨跌、当前持股比例或假设退出收益。</p></div><div id="positions"></div>
+      </section>
+      <section id="journalView" hidden><div class="section-heading"><h1>账户记录</h1><button id="exportBtn">导出记录 ↓</button></div><div id="journal"></div></section>
+    </main><aside class="inbox"><header><h2>组合相关披露</h2><span id="taskCount"></span></header><div id="tasks"></div><div class="inbox-guide"><span>口径提示</span><p>被收购、上市或出现经营异常，都不足以单独证明你的股权已变现或归零。缺少交易对价与资本结构时，仅记录事件。</p></div><header class="dispatch-title"><h2>数据覆盖</h2></header><div id="coverage"></div></aside></div>
+    <footer class="timeline"><span>2019-12</span><span id="observationRange"></span><b>2022-12</b></footer>
+  </div>
+</div>
+<dialog id="companyDialog"><div id="companyBody"></div></dialog>
+<dialog id="riskDialog" aria-label="风险记录"><button class="close" data-close aria-label="关闭风险记录">×</button><div id="riskBody"></div></dialog>
+<dialog id="reportDialog"><div id="reportBody"></div></dialog>
+<dialog id="advanceDialog" aria-labelledby="advanceTitle"><div id="advanceBody"></div></dialog>
+<dialog id="rulesDialog"><button class="close" data-close aria-label="关闭">×</button><h2>数据口径与使用说明</h2><div id="rulesBody"></div></dialog>
+<div id="toast" role="status" hidden></div>
+<script src="/app.js"></script>
+<script src="/trading.js"></script>
+<script src="/evidence.js"></script>
+<script src="/charts.js"></script>
+</body></html>
