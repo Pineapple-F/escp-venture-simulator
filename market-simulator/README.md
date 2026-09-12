@@ -2,9 +2,9 @@
 
 ## 启动
 
-在本目录执行 `.venv/bin/python server.py`，打开 http://127.0.0.1:8790 。首次安装使用 `uv venv --python 3.12` 和 `uv pip install --python .venv/bin/python -r requirements.txt`。
+在项目根目录执行 `./start.sh`，打开 http://127.0.0.1:8790。脚本会在首次运行时创建虚拟环境并安装运行依赖。
 
-缺少 `runtime/universe-v3.json` 时自动构建，依赖上级目录的清洗数据。仅监听本机，不适合直接公网部署。
+仓库已包含 `runtime/universe-v3.json` 和构建所需的匿名清洗数据。缺少运行快照时会从上级目录的 `processed/cleaned/` 自动重建。服务默认仅监听本机，不适合直接公网部署。
 
 ## 当前规则
 
@@ -43,6 +43,7 @@
 ## 验证
 
 ```sh
+.venv/bin/python -m pip install -r test-requirements.txt
 .venv/bin/python -m unittest test_evidence -v
 .venv/bin/python -m unittest test_founder -v
 # 先启动网站，浏览器测试需要 Playwright 和 macOS Chrome

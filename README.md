@@ -8,14 +8,14 @@
 
 ## 运行 2.0
 
-参见 `market-simulator/README.md`。安装该目录依赖后运行：
+仓库已包含网站运行需要的匿名数据快照。克隆后在项目根目录执行：
 
 ```sh
-cd market-simulator
-.venv/bin/python server.py
+./start.sh
 ```
 
-打开 http://127.0.0.1:8790 。完整运行需要项目私有清洗数据或受信任的本地运行快照；仓库不上传原始数据、清洗数据、账户数据库和本地环境。
+脚本会首次创建 Python 虚拟环境、安装依赖并启动网站。打开 http://127.0.0.1:8790 。需要 Python 3.10 或更高版本。
 
-`demo/`、根目录 Dockerfile 和 Cloudflare 工作流仍为旧版入口，本分支不会自动替换线上旧站。
+仓库包含 `processed/cleaned/` 匿名清洗数据和 `market-simulator/runtime/universe-v3.json` 运行快照；不包含本机账户数据库、虚拟环境及未匿名原始数据。账户记录会在首次运行后写入本机 `market-simulator/runtime/saves.sqlite3`。
 
+`demo/`、根目录 Dockerfile 和 Cloudflare 工作流仍是线上旧版入口，不影响本地运行 2.0。
