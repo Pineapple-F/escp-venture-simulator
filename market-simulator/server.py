@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import sqlite3
+from contextlib import closing
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -13,9 +14,12 @@ RUNTIME=ROOT/'runtime';RUNTIME.mkdir(exist_ok=True)
 if not (RUNTIME/'universe-v3.json').exists():
     from build_forward import build_forward
     build_forward()
-UNIVERSE=json.loads((RUNTIME/'universe-v3.json').read_text())
+UNIVERSE = json.loads((RUNTIME / 'universe-v3.json').read_text(encoding='utf-8'))
 from institutions import build_index, candidates, pool
 INSTITUTIONS=build_index(UNIVERSE)
+from knowledge_graph import KnowledgeGraph
+from profiles import profile
+KNOWLEDGE_GRAPH=KnowledgeGraph(UNIVERSE,INSTITUTIONS,profile_loader=profile)
 from collections import defaultdict
 from statistics import median
 # One latest disclosed observation per peer company, same industry/stage/currency.
@@ -25,7 +29,7 @@ for r in LATEST.values():
     if r['industry'] not in ('','未披露',None) and r['amount'] and not r['conflict'] and r['currency'] in ('CNY','USD'):
         PEERS[(r['industry'],r['stage'],r['currency'])].append((r['company'],r['amount']))
 DB=RUNTIME/'saves.sqlite3'
-with sqlite3.connect(DB) as c:c.execute('CREATE TABLE IF NOT EXISTS saves (id TEXT PRIMARY KEY, state TEXT NOT NULL)')
+with closing(sqlite3.connect(DB)) as c, c:c.execute('CREATE TABLE IF NOT EXISTS saves (id TEXT PRIMARY KEY, state TEXT NOT NULL)')
 
 class Handler(BaseHTTPRequestHandler):
     def respond(self,status,data,cookie=None):
@@ -41,15 +45,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path=urlparse(self.path).path
+        if path=='/api/knowledge-graph':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            if json.loads(row[0]).get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            query=parse_qs(urlparse(self.path).query)
+            entity_type=query.get('entity_type',[''])[0]
+            entity_id=query.get('entity_id',[''])[0]
+            if not entity_id or len(entity_id)>200:return self.respond(400,{'error':'实体标识无效'})
+            try:return self.respond(200,KNOWLEDGE_GRAPH.graph(entity_type,entity_id))
+            except ConnectionError:return  # A closed dialog aborts its read-only request.
+            except ValueError as e:return self.respond(400,{'error':str(e)})
+            except KeyError:return self.respond(404,{'error':'未找到该企业或投资人的历史资料'})
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                return self.respond(500,{'error':'图谱读取失败，请稍后重试'})
         if path=='/api/company-profile':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
             cid=parse_qs(urlparse(self.path).query).get('id',[''])[0]
             if not any(c['id']==cid for c in UNIVERSE['companies']):return self.respond(404,{'error':'企业不存在'})
             from profiles import profile
             return self.respond(200,profile(cid,UNIVERSE['start']))
         if path=='/api/institution':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
             query=parse_qs(urlparse(self.path).query);inst=INSTITUTIONS.get(query.get('id',[''])[0])
             if not inst:return self.respond(404,{'error':'投资人不存在'})
@@ -60,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
             items=[dict(company=r['name'],stage=r['stage'],event_date=r['date'],industry=r.get('industry'),amount=r.get('amount'),currency=r.get('currency')) for r in history[(page-1)*12:page*12]]
             return self.respond(200,dict(id=inst['id'],name=inst['name'],cutoff=UNIVERSE['start'],total=len(history),company_count=len({r['company'] for r in history}),page=page,pages=pages,items=items))
         if path=='/api/institutions':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
             query=parse_qs(urlparse(self.path).query)
             cid=query.get('company',[''])[0]
@@ -70,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200,result)
             except ValueError as e:return self.respond(400,{'error':str(e)})
         if path=='/api/company':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
             state=json.loads(row[0])
             if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
@@ -87,18 +107,20 @@ class Handler(BaseHTTPRequestHandler):
             detail['comparison']=dict(n=len(amounts),currency=currency,median_amount=median(amounts) if len(amounts)>=5 else None)
             return self.respond(200,{'company':detail})
         if path=='/api/legacy-export':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             state=json.loads(row[0]) if row else None
             if not state:return self.respond(404,{'error':'当前没有记录'})
             return self.respond(200,state)
         if path=='/api/game':
-            with sqlite3.connect(DB) as c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             state=json.loads(row[0]) if row else None
             legacy=bool(state and state.get('version')!=3)
             return self.respond(200,dict(game=public_state(state,UNIVERSE) if state and not legacy else None,
                 legacy=legacy,meta=UNIVERSE['meta']))
         files={'/':('index.html','text/html'),'/app.js':('app.js','text/javascript'),'/trading.js':('trading.js','text/javascript'),'/evidence.js':('evidence.js','text/javascript'),'/styles.css':('styles.css','text/css')}
         files['/charts.js']=('charts.js','text/javascript')
+        files['/knowledge-graph.js']=('knowledge-graph.js','text/javascript')
+        files['/knowledge-graph.css']=('knowledge-graph.css','text/css')
         files.update({'/founder':('founder.html','text/html'),'/founder.js':('founder.js','text/javascript'),'/founder.css':('founder.css','text/css')})
         if path not in files:return self.respond(404,{'error':'Not found'})
         file,mime=files[path];raw=(ROOT/'web'/file).read_bytes()
@@ -120,10 +142,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(name,str):raise RuleError('账户名称无效')
                 sid=secrets.token_urlsafe(32);state=new_game(UNIVERSE,name.strip() or '远航资本',
                     data.get('currency','CNY'),data.get('initial',100000000),data.get('fee_rate',0))
-                with sqlite3.connect(DB) as c:c.execute('INSERT INTO saves VALUES (?,?)',(sid,json.dumps(state)))
+                with closing(sqlite3.connect(DB)) as c, c:c.execute('INSERT INTO saves VALUES (?,?)',(sid,json.dumps(state)))
                 return self.respond(200,{'game':public_state(state,UNIVERSE)},sid)
             if path!='/api/action':return self.respond(404,{'error':'Not found'})
-            with sqlite3.connect(DB,timeout=10) as c:
+            with closing(sqlite3.connect(DB,timeout=10)) as c, c:
                 c.execute('BEGIN IMMEDIATE')
                 row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
                 if not row:return self.respond(404,{'error':'请先创建基金'})

@@ -17,12 +17,30 @@ function fundingVisual(history){
 }
 let profileRequest=0,profileLoaded=null;
 function companySection(section){
-  for(const key of ['finance','overview','past']){
+  for(const key of ['finance','overview','past','graph']){
     $('#'+key+'Section').hidden=key!==section;
     document.querySelector('[data-section='+key+']').classList.toggle('secondary',key!==section);
   }
   if(section==='overview'&&company&&profileLoaded!==company.id)loadProfile();
+  if(section==='graph'&&company)renderGraphCompanies();
+  window.scrollTo(0,0);
 }
+let graphCompanyPage=0;
+function renderGraphCompanies(){
+  const query=$('#graphCompanySearch').value.trim().toLowerCase();
+  const rows=account.companies.filter(c=>c.id!==company.id&&(c.name+' '+c.id+' '+c.industry+' '+c.region).toLowerCase().includes(query));
+  const pages=Math.max(1,Math.ceil(rows.length/10));graphCompanyPage=Math.min(graphCompanyPage,pages-1);
+  $('#graphCompanyName').textContent=company.name;
+  $('#ownCompanyGraph').dataset.kgId=company.id;
+  $('#graphCompanyCount').textContent=rows.length+' 家其他企业 · 历史资料截至 '+account.meta.cutoff;
+  $('#graphCompanyResults').innerHTML=rows.slice(graphCompanyPage*10,graphCompanyPage*10+10).map(c=>'<button type="button" class="result" data-kg-type="company" data-kg-id="'+esc(c.id)+'"><b>'+esc(c.name)+'</b><span>'+esc(c.industry)+' · '+esc(c.region)+' · 查看图谱 →</span></button>').join('')||'<p>没有匹配的企业，请调整搜索。</p>';
+  $('#graphCompanyPage').textContent=(graphCompanyPage+1)+' / '+pages;
+  $('#graphCompanyPrev').disabled=graphCompanyPage===0;$('#graphCompanyNext').disabled=graphCompanyPage===pages-1;
+}
+$('#graphCompanySearch').oninput=()=>{graphCompanyPage=0;renderGraphCompanies();};
+$('#graphCompanyPrev').onclick=()=>{graphCompanyPage--;renderGraphCompanies();};
+$('#graphCompanyNext').onclick=()=>{graphCompanyPage++;renderGraphCompanies();};
+$('#graphFindInvestors').onclick=()=>{companySection('finance');tab('find');};
 $('#companySections').onclick=e=>{if(e.target.dataset.section)companySection(e.target.dataset.section);};
 async function loadProfile(){
   const id=company.id,ticket=++profileRequest;
@@ -62,7 +80,7 @@ async function investorDetail(id,page=1){
   try{
     const r=await api('/api/institution?'+new URLSearchParams({id,page}));if(ticket!==investorRequest)return;
     investorPage=r.page;$('#investorTitle').textContent=r.name;$('#investorSummary').textContent='已收录 '+r.company_count+' 家企业 · '+r.total+' 次融资案例 · 截至 '+r.cutoff;
-    $('#investorCases').innerHTML=r.items.map(x=>'<article class="record"><b>'+esc(x.company)+'</b><p>'+esc(x.stage)+' · '+esc(x.event_date)+'</p>'+financingInfo(x)+'</article>').join('')||'<p>暂无已收录案例</p>';
+    $('#investorCases').innerHTML='<section class="kg-entry"><div><h3>投资人知识图谱</h3><p>查看参与的融资轮次，继续探索被投企业。</p></div><button type="button" class="kg-entry-action" data-kg-type="institution" data-kg-id="'+esc(id)+'">查看投资网络 →</button></section>'+(r.items.map(x=>'<article class="record"><b>'+esc(x.company)+'</b><p>'+esc(x.stage)+' · '+esc(x.event_date)+'</p>'+financingInfo(x)+'</article>').join('')||'<p>暂无已收录案例</p>');
     $('#investorPage').textContent=r.page+' / '+r.pages;$('#investorPrev').disabled=r.page===1;$('#investorNext').disabled=r.page===r.pages;
   }catch(e){if(ticket===investorRequest){$('#investorSummary').textContent=e.message;$('#investorPage').textContent='';}}
 }
@@ -95,7 +113,7 @@ function renderContacts(){
   $('#contacts').innerHTML=rows.map(i=>{
     const a=r?.applications[i.id],canSubmit=!a||['materials','rejected','declined'].includes(a.status);
     const reserved=r?Object.values(r.applications).filter(x=>['accepted','settled'].includes(x.status)).reduce((sum,x)=>sum+x.amount,0):0;
-    return '<article class="record contact"><h3>'+esc(i.name)+' · '+(a?names[a.status]:'未提交')+'</h3><p>'+esc(a?.feedback||'加入名单不代表已发起融资。')+'</p>'+
+    return '<article class="record contact"><h3>'+esc(i.name)+' · '+(a?names[a.status]:'未提交')+'</h3><button type="button" class="secondary" data-kg-type="institution" data-kg-id="'+esc(i.id)+'">查看投资人图谱</button><p>'+esc(a?.feedback||'加入名单不代表已发起融资。')+'</p>'+
       (canSubmit?'<label>向该机构申请金额（'+cur+'）<input type="number" min="0.01" step="0.01" data-ticket="'+esc(i.id)+'" placeholder="填写本轮拟由该机构认购的金额"></label><button data-finance="submit" data-iid="'+esc(i.id)+'">提交融资方案</button>':'')+
       (a?.status==='terms'?'<p>模拟投资 '+money(a.amount,cur)+' · 本轮投前估值 '+money(r.pre_money,cur)+'</p><p>按已确认金额加本笔测算，本机构持股 '+(a.amount/(r.pre_money+reserved+a.amount)*100).toFixed(2)+'%；本轮全部募足后 '+(a.amount/(r.pre_money+r.target)*100).toFixed(2)+'%。后续同轮交割会继续稀释。</p><button data-finance="accept" data-iid="'+esc(i.id)+'">接受条款</button> <button class="secondary" data-finance="decline" data-iid="'+esc(i.id)+'">拒绝条款</button>':'')+
       (a?.status==='settled'?'<p>已到账 '+money(a.amount,cur)+' · 当前模拟持股 '+(a.ownership*100).toFixed(2)+'%</p>':'')+
@@ -171,7 +189,7 @@ async function selectCompany(id){
   const ticket=++requestId;status('正在读取企业资料…');
   try{
     const result=await api('/api/company?id='+encodeURIComponent(id));if(ticket!==requestId)return;
-    company=result.company;dirty=false;form.reset();profileRequest++;profileLoaded=null;companySection('finance');
+    company=result.company;dirty=false;form.reset();profileRequest++;profileLoaded=null;graphCompanyPage=0;companySection('finance');
     $('#sidebarCompany').textContent=company.name;
     document.querySelectorAll('[data-section]').forEach(b=>b.disabled=false);
     const p=account.founder_plans?.[id]||{currency:account.currency};

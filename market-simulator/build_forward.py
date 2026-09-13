@@ -41,7 +41,7 @@ def build_forward():
         company_master_ids=len({r[0] for r in rows}),excluded_future_establishment=len(excluded),
         cutoff_basis='最新有效日期为2026-04-04；4月不完整，保守采用前一月末。各来源完整性未获独立保证。',
         profile_limit='企业主表为快照，缺少字段可用时间；不宣称严格点时还原。')
-    (ROOT/'runtime/universe-v3.json').write_text(json.dumps(u,ensure_ascii=False,allow_nan=False))
+    (ROOT/'runtime/universe-v3.json').write_text(json.dumps(u,ensure_ascii=False,allow_nan=False),encoding='utf-8')
     print(json.dumps(u['meta'],ensure_ascii=False))
     return u
 

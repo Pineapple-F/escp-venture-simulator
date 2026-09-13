@@ -6,6 +6,27 @@
 
 仓库已包含 `runtime/universe-v3.json` 和构建所需的匿名清洗数据。缺少运行快照时会从上级目录的 `processed/cleaned/` 自动重建。服务默认仅监听本机，不适合直接公网部署。
 
+Windows PowerShell 可在 `market-simulator` 目录执行：
+
+```powershell
+python -m pip install -r requirements.txt
+python server.py
+```
+
+修改后端后需要重启服务；打开 http://127.0.0.1:8790（投资人端）或 http://127.0.0.1:8790/founder（企业端）。快照读取与生成均显式使用 UTF-8。
+
+## 知识图谱
+
+- 投资人端：打开企业详情，点击“查看知识图谱”。
+- 企业端：选择企业后，在侧栏“知识图谱”查看当前企业、搜索其他企业；在机构详情或接触名单查看投资人图谱。
+- 点击节点核对资料与关系来源；选中企业或机构后，点击“以此为中心查看图谱”继续探索。支持返回上一图谱、节点类型筛选、缩放、拖动、适应视图及文字节点列表。浏览图谱不会切换经营企业、修改账户或丢弃融资草稿。
+
+企业图谱包含历史融资轮次、参与机构、通过共同机构连接的其他企业、已收录任职与经营异常记录；机构图谱展示实际参与的融资轮次和被投企业。数据沿用 `universe-v3.json`、机构索引和清洗人员表，无需 Neo4j、外部服务或额外运行依赖。
+
+图谱采用历史快照截止日期，推进模拟日期不会生成新关系。机构参与融资不等于持股或控制；金额为整轮融资额；共同机构不代表两家企业有直接关系。人员记录保留历史或待核验状态，同名人员不跨企业合并；风险来源为按企业、日期及类型汇总的记录。资料缺失时明确提示，单图最多 40 个节点，截断时显示说明。
+
+接口：`GET /api/knowledge-graph?entity_type=company|institution&entity_id=<匿名ID>`，需要新版账户 Cookie。返回 `root_id`、`as_of`、`nodes`、`edges`、`summary`、`truncated` 和 `notes`；节点可含继续浏览的 `entity_id`，边含 `evidence` 来源定位信息。未登录返回 401，参数无效返回 400，实体不存在返回 404。机构参与边按“机构 ID / 轮次 ID”定位索引关联，整轮事件来源保留在融资事件及融资企业关系中。
+
 ## 当前规则
 
 融资方案使用研发、招聘、市场和其他用途预算代替材料勾选。预算合计需与目标一致，缺少月净消耗或现金可用期超过 120 个月会返回补充核验；120 个月为界面分析边界，不是市场标准。该规则仅检查方案数值一致性，不等于真实机构尽调。融资开始后的现金基准和币种不可修改，企业现金由交割账本更新。历史已交割记录保留，旧草稿需补预算才能重新评审。
@@ -31,6 +52,7 @@
 ## 代码与存档
 
 - `server.py`：服务、SQLite 存档及并发版本校验。
+- `knowledge_graph.py`：历史关系索引、来源与图谱规模限制；`web/knowledge-graph.js` / `.css` 为两端共用组件。
 - `evidence_engine.py`：生产操作规则。
 - `engine.py`：共享账户、记账与查询；已移除停用的随机估值和旧交易分支。
 - `data_pipeline.py`、`build_forward.py`：数据构建。
@@ -53,3 +75,13 @@
 ```
 
 覆盖缺失值、币种、资金记账、旧记录保护、详情加载、投资结果、开户基准、刷新恢复和手机布局。旧认购、意向和旧图表测试已移至仓库外备份，不作为当前验收标准。
+
+知识图谱验证（Windows 示例）：
+
+```powershell
+python -m unittest test_knowledge_graph test_evidence test_founder test_financing test_institutions -v
+python -m pip install -r test-requirements.txt
+python test_knowledge_graph_browser.py --channel msedge
+```
+
+浏览器测试自动启动临时本机服务并使用独立临时数据库，不改动真实账户。可用 `--channel chrome` 指定 Chrome，或在安装 Playwright Chromium 后省略非 Windows 平台的 channel；`--output <目录>` 保存桌面和手机截图。覆盖接口参数与账户检查、两端入口、关系来源、节点跳转、错误重试、快速切换、输入保留及手机布局。

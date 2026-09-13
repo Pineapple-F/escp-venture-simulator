@@ -37,6 +37,7 @@ showCompany=async function(id,show=true){
   const r=c.terms.reference,p=game.positions[id],intent=game.intentions?.[id];
   $('#companyBody').innerHTML='<button class="close" data-close aria-label="关闭">×</button><h2>'+esc(companyName(c))+'</h2><p>'+esc(c.latest.stage)+'</p>'+
     '<div class="detail-section"><h3>最近明确融资</h3>'+(r?'<p>'+money(r.amount,r.currency)+' · '+r.date+'</p><p>历史披露，不是当前报价'+(r.currency!==game.currency?'；与账户币种不同':'')+'</p>':'<p>暂无明确金额记录</p>')+'</div>'+
+    '<section class="kg-entry"><div><h3>企业知识图谱</h3><p>查看历史融资、参与机构、关联企业与已收录风险。</p></div><button type="button" class="kg-entry-action" data-kg-type="company" data-kg-id="'+esc(id)+'">查看知识图谱 →</button></section>'+
     '<form class="deal" id="offerForm"><h3>投资 <small>模拟账户</small></h3><label>投资金额（'+game.currency+'）<input id="offerAmount" type="number" min="0.01" step="0.01" max="'+game.cash+'" required value="" placeholder="填写金额"></label><p>按投入成本入仓；暂无估值与股权依据。</p><div class="quote" id="offerPreview" aria-live="polite"></div><button class="primary" type="submit">确认投资</button></form>'+
     (p?'<p>累计投入 '+money(p.cost)+' · '+p.lots.length+' 笔投资</p>':'')+
     (game.last_result?.company===id?'<section class="investment-result" role="status"><h3>投资结果</h3><p>本次投入 '+money(game.last_result.amount)+' · 剩余现金 '+money(game.last_result.cash)+'</p><button type="button" data-result-portfolio>查看投资记录 →</button></section>':'')+
