@@ -14,7 +14,7 @@ def transact(state,action,universe,institutions):
     rounds=s.setdefault('founder_rounds',{})
     if cid not in rounds:
         if kind!='financing_submit':raise RuleError('请先提交融资方案')
-        if not plan.get('target') or not plan.get('pre_money') or plan.get('cash') is None or not plan.get('purpose'):raise RuleError('请保存融资目标、用途、现金与模拟投前估值')
+        if not plan.get('target') or not plan.get('pre_money') or plan.get('cash') is None or plan.get('burn') is None or not plan.get('purpose'):raise RuleError('请保存现金、月均净支出、融资目标、资金用途与投前估值')
         rounds[cid]=dict(target=plan['target'],pre_money=plan['pre_money'],currency=plan['currency'],cash=plan['cash'],opening_cash=plan['cash'],raised=0,date=universe['start'],week=0,applications={},ledger=[])
     r=rounds[cid];apps=r['applications']
     def log(text):r['ledger'].append(dict(date=r['date'],text=text))

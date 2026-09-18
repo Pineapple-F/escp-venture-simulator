@@ -1,16 +1,16 @@
 'use strict';
 filter='all';
-$('.intro').textContent='基于截至2026年3月的历史资料，向未来模拟投资。';
-$('.start-brief').innerHTML='<h2>真实资料，独立模拟</h2><p>融资记录来自数据；报价、成交和股权单独模拟。</p>';
+$('.intro').textContent='预测企业未来事件，建立投资组合并持续推进。';
+$('.start-brief').innerHTML='<h2>从发现到跟踪</h2><p>筛选企业、查看发展路径、记录投资，并观察组合随企业发展而变化。</p>';
 $('.landing-stats').innerHTML='<div><b>含无融资记录企业</b><span>不将缺失记录视为未融资</span></div><div><b>2026—2029</b><span>前向模拟</span></div>';
 $('#legacyNotice').innerHTML='旧版账户已保留。<a href="/api/legacy-export" download="historical-account.json">下载旧记录</a>，或新建前向模拟账户。';
-$('#newForm>.tour-note').textContent='独立币种账户；未来走势为情景模拟，不是真实预测。';
+$('#newForm>.tour-note').textContent='人民币与美元账户分别记账；每月推进企业事件与组合变化。';
 $('.timeline>span:first-child').textContent='2026-03';$('.timeline>b').textContent='2029-03';
 $('#regime').textContent='模拟日期';
 $('#endBanner').textContent='三年模拟结束，可查看持仓并导出账户。';
 $('[data-filter=current]').textContent='有融资记录';
 document.title='长线 · 创投市场模拟';
-$('.performance p').textContent='模拟估值不是现金；未退出收益计入浮盈亏。';
+if($('.performance p'))$('.performance p').textContent='投资组合与资金变化。';
 $('.account div:nth-child(1)>span').textContent='模拟总资产';
 $('.account div:nth-child(3)>span').textContent='模拟持仓价值';
 $('.account div:nth-child(4)>span').textContent='浮动盈亏';
@@ -32,7 +32,7 @@ render=function(){
   $('#fees').textContent=money(point.unrealized??0);
   const alerts=game.notifications||[];
   $('#taskCount').textContent=alerts.length;
-  $('#tasks').innerHTML=alerts.map(n=>'<button class="task" data-company="'+n.company+'"><strong>'+esc(companyName(game.companies.find(c=>c.id===n.company)))+'</strong><p>'+esc(n.reason)+'</p><b>'+money(n.delta)+' · 模拟变动</b><small>'+n.date+'</small></button>').join('')||'<p>暂无持仓变动</p>';
+  $('#tasks').innerHTML=alerts.map(n=>'<button class="task" data-company="'+n.company+'"><strong>'+esc(companyName(game.companies.find(c=>c.id===n.company)))+'</strong><p>'+esc(n.reason)+'</p><b>'+money(n.delta)+' · 本月价值变动</b><small>'+esc(n.date||game.as_of)+'</small></button>').join('')||'<p>本月暂无持仓变动</p>';
   $('#coverage').innerHTML='<p>'+game.companies.length.toLocaleString()+' 家企业 · 历史截止 '+game.meta.cutoff+'</p><p>此后为模拟，不再读取未来历史。</p>';
 };
 function companyName(c){return !c?'企业':c.name.startsWith('co_')?'匿名企业 · '+c.id.slice(-6):c.name}

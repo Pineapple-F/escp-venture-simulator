@@ -1,7 +1,7 @@
 'use strict';
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let game=null,view='market',filter='current',pageIndex=0,selected=null,busy=false,timer;
+let game=null,view='discover',discoverMode='future',accountMode='portfolio',companyFilter='all',filter='current',pageIndex=0,selected=null,busy=false,timer;
 const PAGE_SIZE=30;
 const money=(n,currency=game?.currency||'CNY')=>n===null||n===undefined?'未披露':(currency==='CNY'?'¥':'$')+Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
 const short=(n,currency)=>n===null||n===undefined?'未披露':(currency==='CNY'?'¥':'$')+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toFixed(2));
@@ -9,6 +9,10 @@ function toast(message){$('#toast').textContent=message;$('#toast').hidden=false
 async function api(path,body){
   const response=await fetch(path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
   const result=await response.json();
+  if(result.game?.static_state_omitted&&game){
+    result.game.companies=game.companies;result.game.market=game.market;
+    delete result.game.static_state_omitted;
+  }
   if(!response.ok){if(result.game){game=result.game;render()}throw Error(result.error||'请求失败')}
   return result;
 }
@@ -18,7 +22,7 @@ function eligibility(r){
   if(r.available.slice(0,7)!==game.as_of.slice(0,7))return '非当前月份披露';
   if(!game.equity_stages.includes(r.stage))return '仅观察：非支持的股权融资轮次';
   if(r.conflict)return '仅观察：来源冲突';
-  if(r.amount===null)return '仅观察：融资金额未核验';
+  if(r.amount===null)return '融资金额未披露';
   if(r.currency!==game.currency)return '仅观察：与账户币种不同';
   if(allocated(r))return '已记录配置';
   if(game.fees_payable)return '有待支付管理费';
@@ -40,13 +44,17 @@ function render(){
   $('#cost').textContent=money(current.cost);$('#fees').textContent=money(game.fees_paid+game.fees_payable);
   $('#endBanner').hidden=!game.ended;
   $('#observationRange').textContent='当前观察至 '+game.as_of;
-  for(const v of ['market','portfolio','journal']){
-    $('#'+v+'View').hidden=view!==v;
-    $('[data-view="'+v+'"]').classList.toggle('active',view===v);
-  }
+  $('#marketView').hidden=view!=='discover'||discoverMode!=='history';
+  $('#portfolioView').hidden=view!=='account'||accountMode!=='portfolio';
+  $('#journalView').hidden=view!=='account'||accountMode!=='journal';
+  $('#companiesView').hidden=view!=='companies';
+  $('#discoverTabs').hidden=view!=='discover';$('#accountTabs').hidden=view!=='account';
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  document.querySelectorAll('[data-discover]').forEach(b=>b.classList.toggle('active',b.dataset.discover===discoverMode));
+  document.querySelectorAll('[data-account]').forEach(b=>b.classList.toggle('active',b.dataset.account===accountMode));
   const market=game.market.at(-1);
   $('#pulseTitle').textContent=game.as_of.slice(0,7)+' · 样本新增 '+market.rounds+' 条候选融资记录';
-  $('#pulseCopy').textContent='其中 '+market.disclosed+' 条可核验金额 · 人民币 '+short(market.CNY,'CNY')+' · 美元 '+short(market.USD,'USD')+'；曲线为记录数，不是市场收益率。';
+  $('#pulseCopy').textContent=market.disclosed+' 条披露金额 · 人民币 '+short(market.CNY,'CNY')+' · 美元 '+short(market.USD,'USD');
   $('#marketTrend path').setAttribute('d',drawPath(game.market.map(x=>x.rounds)));
   renderMarket();renderPortfolio();renderJournal();renderCoverage();
 }
@@ -60,7 +68,7 @@ function renderMarket(){
   $('#marketRows').innerHTML=rows.slice(pageIndex*PAGE_SIZE,(pageIndex+1)*PAGE_SIZE).map(c=>{
     const r=c.latest;
     return '<tr><td><button class="company-link" data-company="'+c.id+'"><strong>'+esc(c.name)+'</strong></button><small>'+esc(c.region)+' · '+esc(r.stage)+'</small></td><td class="money">'+short(r.amount,r.currency)+'</td><td>'+r.available+'<small>'+(r.publication_proxy?'披露日缺失，以事件日代替':'含披露日校验')+'</small></td><td><span class="badge '+(eligibility(r)?'muted':'')+'">'+esc(eligibility(r)||'可投资 · 虚拟资金')+'</span></td><td>'+(!eligibility(r)?'<button class="primary" data-invest-company="'+c.id+'" data-round="'+r.id+'">投资</button> ':'')+'<button class="row-open" data-company="'+c.id+'">资料 ↗</button></td></tr>';
-  }).join('')||'<tr><td colspan="5"><div class="empty">当前筛选没有记录。可查看“关注范围”，或继续至下个月；没有披露不代表没有经营活动。</div></td></tr>';
+  }).join('')||'<tr><td colspan="5"><div class="empty">当前筛选没有记录。</div></td></tr>';
   $('#pageLabel').textContent=(pageIndex+1)+' / '+pages+' 页';
   $('#prevPage').disabled=pageIndex===0;$('#nextPage').disabled=pageIndex>=pages-1;
 }
@@ -70,7 +78,7 @@ function renderPortfolio(){
   $('#chart').innerHTML='<svg viewBox="0 0 700 190" role="img" aria-label="现金与投资成本变化"><path d="'+path('cash')+'" fill="none" stroke="#277358" stroke-width="2.5"/><path d="'+path('cost')+'" fill="none" stroke="#899379" stroke-dasharray="4 5" stroke-width="2"/></svg>';
   $('#positions').innerHTML=game.companies.filter(c=>game.positions[c.id]).map(c=>{
     const p=game.positions[c.id];
-    return '<article class="position"><div><button class="row-open" data-company="'+c.id+'"><h3>'+esc(c.name)+' ↗</h3></button><p>'+p.lots.length+' 笔假设认购 · 最新披露 '+c.latest.available+'</p><p>当前股权比例与公允价值未核验，不报告投资收益。</p></div><div><span class="money">'+money(p.cost)+'</span><p>累计成本</p></div></article>';
+    return '<article class="position"><div><button class="row-open" data-company="'+c.id+'"><h3>'+esc(c.name)+' ↗</h3></button><p>'+p.lots.length+' 笔投资 · 最新披露 '+c.latest.available+'</p></div><div><span class="money">'+money(p.cost)+'</span><p>累计成本</p></div></article>';
   }).join('')||'<div class="empty">暂无配置。可在融资市场查看企业记录，或继续持有现金。</div>';
 }
 function renderJournal(){
@@ -95,7 +103,7 @@ function showCompany(id,show=true){
     (available.length?'<form class="deal" id="investForm"><h3>记录假设认购</h3><label>当月可配置记录<select id="roundSelect">'+available.map(r=>'<option value="'+r.id+'">'+esc(r.stage)+' / '+r.date+' / '+money(r.amount,r.currency)+'</option>').join('')+'</select></label><label>认购金额（'+game.currency+'）<input id="ticket" type="number" min="0.01" step="0.01" required></label><details><summary>可选：录入自己的投后估值假设</summary><label>假设投后估值（'+game.currency+'）<input id="postValuation" type="number" min="0.01" step="0.01" placeholder="留空：不计算认购时股权比例"></label><p>这不是数据提供的交易条款。仅计算本笔认购时的假设股权，不代表后续持股。缺少后续资本结构时，不自动计算稀释。</p></details><div class="quote" id="quote" aria-live="polite"></div><p>视为参与已披露融资中的一部分，而非额外创造一轮融资。确认后现金转为投资成本；历史事件不会改变。此记录不是实际交易或当前可执行报价。</p><button class="primary" type="submit">确认配置并记账</button></form>':'<div class="deal-locked">'+esc(eligibility(c.latest)||'暂无可新增配置的记录')+'。仍可查阅全部已披露资料。</div>')+
     (p?'<div class="detail-section"><h3>本账户认购记录</h3>'+p.lots.map(l=>'<p>'+l.date+' · '+money(l.amount)+' · '+(l.entry_ownership===null?'未设置股权估算':'本笔认购时假设股权 '+(l.entry_ownership*100).toFixed(3)+'%，不是当前持股比例')+'</p>').join('')+'</div>':'')+
     '<div class="detail-section"><h3>融资披露记录</h3>'+[...c.history].reverse().map(roundFacts).join('')+'</div>'+
-    '<div class="detail-section"><h3>经营异常记录</h3>'+(c.risks.map(r=>'<p>'+r.date+' · '+(r.type==='abnormal_listing'?'列入经营异常名录':'移出经营异常名录')+'（以事件日作为可见时点）</p>').join('')||'<p>截至当前时点，样本未收录该企业的经营异常记录；不等于确认无风险。</p>')+'</div>';
+    '<div class="detail-section"><h3>经营异常记录</h3>'+(c.risks.map(r=>'<p>'+r.date+' · '+(r.type==='abnormal_listing'?'列入经营异常名录':'移出经营异常名录')+'</p>').join('')||'<p>暂无经营异常记录。</p>')+'</div>';
   if(available.length){$('#ticket').value=Math.min(1000000,available[0].amount,game.cash);updateQuote()}
   if(show&&!$('#companyDialog').open)$('#companyDialog').showModal();
 }
@@ -114,19 +122,22 @@ async function act(body){
   try{
     const result=await api('/api/action',{...body,revision:game.revision});game=result.game;render();
     if(body.type==='advance')showReport(previous);
-    else{showCompany(selected,false);toast('配置已记录，未生成任何估值收益。')}
+    else{
+      showCompany(selected,false);
+      toast(game.last_result?.projection?.predicted?'投资已记录，已建立月度预测路径。':'投资已记录。');
+    }
   }catch(e){toast(e.message)}
   finally{busy=false;render();if($('#companyDialog').open)showCompany(selected,false)}
 }
 function requestAdvance(){
   if(busy||game.ended)return;
   const available=game.companies.flatMap(c=>c.available).filter(r=>!eligibility(r)).length;
-  $('#advanceBody').innerHTML='<button class="close" data-close aria-label="关闭">×</button><h2 id="advanceTitle">更新至下个月末</h2><p class="workspace-note">将读取下一月份的历史披露。当前月份 '+available+' 条可配置记录将转为仅供观察，不生成随机经营结果。</p><p class="workspace-note">按账户参数计提管理费 '+money(game.initial*game.fee_rate/12)+'；缺失的估值与退出条款不会自动补齐。'+(game.month===35?'下一月是本次历史资料区间末。':'')+'</p><div class="preview-actions"><button data-close>暂不更新</button><button class="primary" data-confirm-month>确认更新</button></div>';
+  $('#advanceBody').innerHTML='<button class="close" data-close aria-label="关闭">×</button><h2 id="advanceTitle">更新至下个月末</h2><p class="workspace-note">读取下一月份资料，当前有 '+available+' 条融资记录。</p><p class="workspace-note">本月管理费 '+money(game.initial*game.fee_rate/12)+'。'+(game.month===35?'下一月为资料区间末。':'')+'</p><div class="preview-actions"><button data-close>取消</button><button class="primary" data-confirm-month>确认更新</button></div>';
   $('#advanceDialog').showModal();
 }
 function showReport(previous){
   const m=game.market.at(-1),updates=game.log.slice(previous.log.length);
-  $('#reportBody').innerHTML='<button class="close" data-close aria-label="关闭">×</button><p class="eyebrow">历史资料更新</p><h2>'+game.as_of+'</h2><div class="context-help"><p>本月样本新增 '+m.rounds+' 条候选融资记录，其中 '+m.disclosed+' 条金额可核验。</p><p>账户现金变化 '+money(game.cash-previous.cash)+'。融资披露不等于投资收益，本次不自动重估持仓。</p></div><div class="report-list">'+updates.map(e=>'<p>'+esc(e.text)+'</p>').join('')+'</div><button class="primary" data-close>返回工作台</button>';
+  $('#reportBody').innerHTML='<button class="close" data-close aria-label="关闭">×</button><p class="eyebrow">资料更新</p><h2>'+game.as_of+'</h2><div class="context-help"><p>本月新增 '+m.rounds+' 条融资记录，其中 '+m.disclosed+' 条披露金额。</p><p>账户现金变化 '+money(game.cash-previous.cash)+'。</p></div><div class="report-list">'+updates.map(e=>'<p>'+esc(e.text)+'</p>').join('')+'</div><button class="primary" data-close>返回工作台</button>';
   $('#reportDialog').showModal();
 }
 function rules(){
@@ -153,6 +164,8 @@ document.addEventListener('click',e=>{
   }
   if(b.dataset.company){showCompany(b.dataset.company);return}
   if(b.dataset.view){view=b.dataset.view;render();return}
+  if(b.dataset.discover){view='discover';discoverMode=b.dataset.discover;render();return}
+  if(b.dataset.account){view='account';accountMode=b.dataset.account;render();return}
   if(b.dataset.filter){filter=b.dataset.filter;pageIndex=0;renderMarket();return}
   if(b.hasAttribute('data-confirm-month')){$('#advanceDialog').close();act({type:'advance'})}
 });
@@ -169,7 +182,7 @@ $('#newForm').onsubmit=async e=>{
   e.preventDefault();if(busy)return;busy=true;const b=e.target.querySelector('button[type=submit]');b.disabled=true;
   try{
     const f=new FormData(e.target),result=await api('/api/new',{name:f.get('name'),currency:f.get('currency'),initial:Number(f.get('initial')),fee_rate:Number(f.get('fee'))/100});
-    game=result.game;view='market';filter='current';pageIndex=0;selected=null;$('#search').value='';$('#legacyNotice').hidden=true;render();
+    game=result.game;view='discover';discoverMode='future';filter='current';pageIndex=0;selected=null;$('#search').value='';$('#legacyNotice').hidden=true;render();
   }catch(e){toast(e.message)}
   finally{busy=false;b.disabled=false;if(game)render()}
 };

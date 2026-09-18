@@ -2,6 +2,7 @@
 import json
 import duckdb
 from data_pipeline import build,SOURCE,ROOT
+from cohort_filter import model_ready_companies
 
 CUTOFF='2026-03-31'
 
@@ -23,6 +24,14 @@ def build_forward():
             established=established.isoformat() if established else None,
             closed=any(d and d.isoformat()<=CUTOFF for d in [cancelled,revoked]))
     for cid in excluded:companies.pop(cid,None)
+    cohort_before_cleaning=len(companies)
+    closed_at_cutoff={cid for cid,item in companies.items() if item.get('closed')}
+    companies={cid:item for cid,item in companies.items() if cid not in closed_at_cutoff}
+    research=ROOT.parent.parent/'research'
+    history_paths=[research/'enterprise_path_clean/history_events.parquet',
+                   ROOT/'runtime'/f'model-live-history-{CUTOFF}.parquet']
+    model_ready,history_audit=model_ready_companies(companies,history_paths,CUTOFF)
+    companies={cid:item for cid,item in companies.items() if cid in model_ready}
     # Include risk records for companies without funding as well.
     risks=db.execute("""SELECT company_id_anon,cast(event_date AS DATE),event_type,count(*)
       FROM read_parquet(?) WHERE company_id_anon IS NOT NULL
@@ -39,6 +48,9 @@ def build_forward():
     u['meta'].update(version=3,start=CUTOFF,end=u['end'],cutoff=CUTOFF,
         cohort_size=len(companies),no_funding_companies=len(set(companies)-funded),
         company_master_ids=len({r[0] for r in rows}),excluded_future_establishment=len(excluded),
+        cohort_before_cleaning=cohort_before_cleaning,
+        closed_at_cutoff_excluded=len(closed_at_cutoff),
+        **history_audit,
         cutoff_basis='最新有效日期为2026-04-04；4月不完整，保守采用前一月末。各来源完整性未获独立保证。',
         profile_limit='企业主表为快照，缺少字段可用时间；不宣称严格点时还原。')
     (ROOT/'runtime/universe-v3.json').write_text(json.dumps(u,ensure_ascii=False,allow_nan=False),encoding='utf-8')

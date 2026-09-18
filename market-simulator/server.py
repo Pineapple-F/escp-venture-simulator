@@ -1,7 +1,9 @@
 import json
+import gzip
 import os
 import secrets
 import sqlite3
+from datetime import date
 from contextlib import closing
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,11 +17,27 @@ if not (RUNTIME/'universe-v3.json').exists():
     from build_forward import build_forward
     build_forward()
 UNIVERSE = json.loads((RUNTIME / 'universe-v3.json').read_text(encoding='utf-8'))
+COMPANY_META={item['id']:dict(id=item['id'],name=item.get('name') or item['id'],
+    industry=item.get('industry') or '未披露',region=item.get('region') or '未披露')
+    for item in UNIVERSE['companies']}
+for item in UNIVERSE['rounds']:
+    if item['company'] in COMPANY_META:
+        COMPANY_META[item['company']].update(name=item.get('name') or item['company'],
+            industry=item.get('industry') or '未披露',region=item.get('region') or '未披露')
 from institutions import build_index, candidates, pool
 INSTITUTIONS=build_index(UNIVERSE)
 from knowledge_graph import KnowledgeGraph
+from model_forecast import ModelForecast
+from forecast_catalog import ForecastCatalog
+from financial_projection import FinancialProjection
 from profiles import profile
 KNOWLEDGE_GRAPH=KnowledgeGraph(UNIVERSE,INSTITUTIONS,profile_loader=profile)
+MODEL_FORECAST=ModelForecast(
+    ROOT.parent/'scripts/live_model_worker.py',UNIVERSE['companies'],UNIVERSE['start'])
+MODEL_FORECAST.warm()
+FORECAST_CATALOG=ForecastCatalog(
+    RUNTIME/f'investor-forecast-catalog-{UNIVERSE["start"]}.json',UNIVERSE['start'])
+FINANCIAL_PROJECTION=FinancialProjection(UNIVERSE)
 from collections import defaultdict
 from statistics import median
 # One latest disclosed observation per peer company, same industry/stage/currency.
@@ -31,13 +49,24 @@ for r in LATEST.values():
 DB=RUNTIME/'saves.sqlite3'
 with closing(sqlite3.connect(DB)) as c, c:c.execute('CREATE TABLE IF NOT EXISTS saves (id TEXT PRIMARY KEY, state TEXT NOT NULL)')
 
+def action_state(state):
+    """Return changed account data without resending the immutable company universe."""
+    result=public_state(state,UNIVERSE)
+    result.pop('companies',None);result.pop('market',None)
+    result['static_state_omitted']=True
+    return result
+
 class Handler(BaseHTTPRequestHandler):
     def respond(self,status,data,cookie=None):
         raw=json.dumps(data,ensure_ascii=False).encode()
+        compressed='gzip' in self.headers.get('Accept-Encoding','') and len(raw)>1024
+        body=gzip.compress(raw,compresslevel=5) if compressed else raw
         self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8')
-        self.send_header('Content-Length',str(len(raw)));self.send_header('Cache-Control','no-store')
+        self.send_header('Content-Length',str(len(body)));self.send_header('Cache-Control','no-store')
+        if compressed:self.send_header('Content-Encoding','gzip')
+        self.send_header('Vary','Accept-Encoding')
         if cookie:self.send_header('Set-Cookie',f'market_save={cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000')
-        self.end_headers();self.wfile.write(raw)
+        self.end_headers();self.wfile.write(body)
 
     def session(self):
         cookie=SimpleCookie();cookie.load(self.headers.get('Cookie',''))
@@ -45,6 +74,117 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path=urlparse(self.path).path
+        if path=='/api/model-forecast':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            company=parse_qs(urlparse(self.path).query).get('id',[''])[0]
+            if not company or len(company)>200:return self.respond(400,{'error':'企业标识无效'})
+            try:
+                result=FORECAST_CATALOG.get(company)
+                if result is None or 'history_years' not in result:
+                    result=MODEL_FORECAST.get(company)
+                    FORECAST_CATALOG.record(result)
+                result=dict(result)
+                result['financial_projection']=FINANCIAL_PROJECTION.project(company,result,state['currency'])
+                return self.respond(200,result)
+            except KeyError:return self.respond(404,{'error':'企业不存在'})
+            except (RuntimeError,TimeoutError,ValueError):
+                import traceback
+                traceback.print_exc()
+                return self.respond(503,{'error':'模型暂时无法完成预测，请稍后重试'})
+        if path=='/api/financing-scenario-forecast':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            company=parse_qs(urlparse(self.path).query).get('id',[''])[0]
+            if not company or len(company)>200:return self.respond(400,{'error':'企业标识无效'})
+            from financing_scenario import build
+            scenario=build(state,company,INSTITUTIONS)
+            if not scenario['ready']:
+                return self.respond(200,scenario)
+            try:
+                baseline=FORECAST_CATALOG.get(company)
+                if baseline is None:
+                    baseline=MODEL_FORECAST.get(company)
+                    FORECAST_CATALOG.record(baseline)
+                updated=MODEL_FORECAST.get_scenario(company,scenario['events'],scenario['as_of'])
+                return self.respond(200,{**scenario,'baseline':baseline,'forecast':updated})
+            except KeyError:return self.respond(404,{'error':'企业不存在'})
+            except (RuntimeError,TimeoutError,ValueError):
+                import traceback
+                traceback.print_exc()
+                return self.respond(503,{'error':'模型暂时无法生成融资后的发展路径，请稍后重试'})
+        if path=='/api/custom-event-types':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            from custom_path import taxonomy
+            return self.respond(200,{'categories':taxonomy()})
+        if path=='/api/custom-forecast':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0]);custom=state.get('founder_custom',{})
+            events=custom.get('events',[])
+            if not custom.get('profile',{}).get('name'):return self.respond(400,{'error':'请先保存企业名称'})
+            if not events:return self.respond(400,{'error':'请先添加至少一个历史节点'})
+            try:
+                result=MODEL_FORECAST.get_custom(events,date.today().isoformat())
+                industry=custom.get('profile',{}).get('industry','').strip()
+                evidence_factor=min(1.0,len(events)/4)
+                joined=[]
+                for match in result.pop('similar',[]):
+                    meta=COMPANY_META.get(match['company'])
+                    if not meta:continue
+                    same=bool(industry and industry!='未披露' and meta['industry']==industry)
+                    display=match['similarity']*(.55+.45*evidence_factor)+(.03 if same else 0)
+                    joined.append({**match,**meta,'same_industry':same,
+                                   'display_similarity':round(min(.99,display),4)})
+                joined.sort(key=lambda item:(-item['display_similarity'],item['name']))
+                result['similar']=joined[:8]
+                result['profile']=custom['profile']
+                result['reference_cutoff']=UNIVERSE['start']
+                return self.respond(200,result)
+            except (RuntimeError,TimeoutError,ValueError):
+                import traceback
+                traceback.print_exc()
+                return self.respond(503,{'error':'模型暂时无法完成自建路径预测，请稍后重试'})
+        if path=='/api/tracked-companies':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            watched=state.get('forecast_watchlist',{})
+            followups=state.get('forecast_followups',{})
+            positions=state.get('positions',{})
+            ids=set(watched)|set(followups)|set(positions)
+            items=[]
+            for cid in ids:
+                meta=COMPANY_META.get(cid)
+                if not meta:continue
+                items.append({**meta,'watched':cid in watched,'invested':bool(positions.get(cid)),
+                              'followups':list(followups.get(cid,{}).values())})
+            items.sort(key=lambda item:(not item['watched'],not item['invested'],item['name']))
+            return self.respond(200,{'items':items})
+        if path=='/api/forecast-opportunities':
+            with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            query=parse_qs(urlparse(self.path).query)
+            try:
+                event=query.get('event',['融资'])[0]
+                months=int(query.get('months',['12'])[0])
+                page=int(query.get('page',['1'])[0])
+                watched=query.get('watched',['0'])[0]=='1'
+                companies=public_state(state,UNIVERSE)['companies']
+                result=FORECAST_CATALOG.query(
+                    companies,state.get('forecast_watchlist',{}),event,months,
+                    query.get('q',[''])[0],watched,page,current_month=state.get('month',0))
+                result['watchlist_count']=len(state.get('forecast_watchlist',{}))
+                return self.respond(200,result)
+            except ValueError as e:return self.respond(400,{'error':str(e)})
         if path=='/api/knowledge-graph':
             with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
@@ -121,6 +261,8 @@ class Handler(BaseHTTPRequestHandler):
         files['/charts.js']=('charts.js','text/javascript')
         files['/knowledge-graph.js']=('knowledge-graph.js','text/javascript')
         files['/knowledge-graph.css']=('knowledge-graph.css','text/css')
+        files['/timeline.css']=('timeline.css','text/css')
+        files['/forecast-ui.js']=('forecast-ui.js','text/javascript')
         files.update({'/founder':('founder.html','text/html'),'/founder.js':('founder.js','text/javascript'),'/founder.css':('founder.css','text/css')})
         if path not in files:return self.respond(404,{'error':'Not found'})
         file,mime=files[path];raw=(ROOT/'web'/file).read_bytes()
@@ -145,6 +287,17 @@ class Handler(BaseHTTPRequestHandler):
                 with closing(sqlite3.connect(DB)) as c, c:c.execute('INSERT INTO saves VALUES (?,?)',(sid,json.dumps(state)))
                 return self.respond(200,{'game':public_state(state,UNIVERSE)},sid)
             if path!='/api/action':return self.respond(404,{'error':'Not found'})
+            offer_forecast=None
+            if data.get('type')=='offer':
+                company=data.get('company')
+                if isinstance(company,str):
+                    try:
+                        offer_forecast=FORECAST_CATALOG.get(company)
+                        if offer_forecast is None or 'history_years' not in offer_forecast:
+                            offer_forecast=MODEL_FORECAST.get(company)
+                            FORECAST_CATALOG.record(offer_forecast)
+                    except (KeyError,RuntimeError,TimeoutError,ValueError):
+                        offer_forecast=None
             with closing(sqlite3.connect(DB,timeout=10)) as c, c:
                 c.execute('BEGIN IMMEDIATE')
                 row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
@@ -152,16 +305,25 @@ class Handler(BaseHTTPRequestHandler):
                 state=json.loads(row[0])
                 if state.get('version')!=3:raise RuleError('旧账户已归档，请建立前向模拟账户')
                 if data.get('revision')!=state['revision']:
-                    return self.respond(409,{'error':'存档已更新，请刷新后操作','game':public_state(state,UNIVERSE)})
+                    return self.respond(409,{'error':'存档已更新，请刷新后操作','game':action_state(state)})
                 if isinstance(data.get('type'),str) and data['type'].startswith('financing_'):
                     from financing import transact
                     state=transact(state,data,UNIVERSE,INSTITUTIONS)
                 elif data.get('type')=='founder_contact':
                     from founder import save_contact
                     state=save_contact(state,data,UNIVERSE,INSTITUTIONS)
-                else:state=apply(state,data,UNIVERSE)
+                elif data.get('type')=='founder_contact_remove':
+                    from founder import remove_contact
+                    state=remove_contact(state,data,UNIVERSE,INSTITUTIONS)
+                elif data.get('type') in ('forecast_plan','forecast_watch','forecast_followup','founder_custom_profile','founder_custom_event_add','founder_custom_event_delete','founder_custom_mode','founder_custom_finance_plan'):
+                    from forecast_workflow import transact
+                    state=transact(state,data,UNIVERSE)
+                else:
+                    projection=(FINANCIAL_PROJECTION.project(data.get('company'),offer_forecast,state['currency'])
+                                if offer_forecast is not None else None)
+                    state=apply(state,data,UNIVERSE,projection=projection)
                 c.execute('UPDATE saves SET state=? WHERE id=?',(json.dumps(state),self.session()))
-            return self.respond(200,{'game':public_state(state,UNIVERSE)})
+            return self.respond(200,{'game':action_state(state)})
         except (RuleError,ValueError,TypeError) as e:self.respond(400,{'error':str(e)})
         except Exception:
             import traceback

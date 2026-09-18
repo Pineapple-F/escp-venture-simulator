@@ -13,6 +13,8 @@ with sync_playwright() as p:
         if detail['institutions']:break
     else:raise AssertionError('No institution matches')
     page.locator('#search').fill(c['id']);page.locator('.result').first.click()
+    expect(page.locator('#picker')).to_be_hidden(timeout=30000)
+    page.locator('[data-section=actions]').click();page.locator('[data-tab=find]').click()
     expect(page.locator('[data-add]').first).to_be_visible(timeout=30000)
     first_name=page.locator('.institution-card h3').first.inner_text()
     iid=page.locator('[data-investor]').first.get_attribute('data-investor')
@@ -34,10 +36,11 @@ with sync_playwright() as p:
     assert page.locator('[data-goal]').count()==0
     page.locator('[data-tab=find]').click()
     page.locator('[data-add]').first.click()
-    expect(page.locator('[data-add]').first).to_have_text('已加入名单',timeout=30000)
+    expect(page.locator('[data-add]').first).to_have_text('已选择',timeout=30000)
     page.locator('[data-tab=contacts]').click()
     expect(page.locator('.contact')).to_contain_text('未提交')
-    page.reload();page.locator('[data-tab=contacts]').click()
+    page.reload();page.locator('[data-section=actions]').click();page.locator('[data-tab=contacts]').click()
+    page.locator('.financing-execution>summary').click()
     assert page.locator('#goals').count()==0
     expect(page.locator('[data-finance=submit]')).to_be_visible(timeout=30000)
     page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')

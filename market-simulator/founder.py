@@ -5,6 +5,15 @@ from engine import RuleError, number
 
 MATERIALS=('financials','use_of_funds','cap_table','team','risk_explanation')
 BUDGET_KEYS=('research','hiring','marketing','other')
+PURPOSE_LABELS={'research':'产品研发','hiring':'团队招聘','marketing':'市场拓展','other':'其他用途'}
+
+def _allocated_budget(target,categories):
+    """Allocate the stated round target across selected purposes without extra user input."""
+    if not target or not categories:return {key:0 for key in BUDGET_KEYS}
+    cents=round(target*100);base,remainder=divmod(cents,len(categories))
+    values={key:0 for key in BUDGET_KEYS}
+    for index,key in enumerate(categories):values[key]=(base+(1 if index<remainder else 0))/100
+    return values
 
 def budget_issues(plan):
     budget=plan.get('budget',{})
@@ -30,12 +39,25 @@ def save_plan(state, action, universe):
     for key in ('cash','burn','target','pre_money'):
         value=raw.get(key)
         plan[key]=None if value is None else round(number(value,key,0),2)
-    purpose=raw.get('purpose','')
-    if not isinstance(purpose,str) or len(purpose)>1200:raise RuleError('资金用途限 1200 字')
-    plan['purpose']=purpose.strip()
-    budget=raw.get('budget',{})
-    if not isinstance(budget,dict):raise RuleError('用途预算无效')
-    plan['budget']={k:round(number(budget.get(k,0), '用途预算',0),2) for k in BUDGET_KEYS}
+    categories=raw.get('purpose_categories')
+    if categories is not None:
+        if not isinstance(categories,list) or not categories or any(key not in PURPOSE_LABELS for key in categories):
+            raise RuleError('请选择至少一项资金用途')
+        categories=list(dict.fromkeys(categories))
+        detail=raw.get('purpose_detail','')
+        if not isinstance(detail,str) or len(detail)>240:raise RuleError('用途补充限 240 字')
+        detail=detail.strip()
+        summary='、'.join(PURPOSE_LABELS[key] for key in categories)
+        plan['purpose_categories']=categories;plan['purpose_detail']=detail
+        plan['purpose']=summary+('；'+detail if detail else '')
+        plan['budget']=_allocated_budget(plan['target'],categories)
+    else:
+        purpose=raw.get('purpose','')
+        if not isinstance(purpose,str) or len(purpose)>1200:raise RuleError('资金用途限 1200 字')
+        plan['purpose']=purpose.strip()
+        budget=raw.get('budget',{})
+        if not isinstance(budget,dict):raise RuleError('用途预算无效')
+        plan['budget']={k:round(number(budget.get(k,0), '用途预算',0),2) for k in BUDGET_KEYS}
     materials=raw.get('materials',[])
     if not isinstance(materials,list) or any(not isinstance(k,str) or k not in MATERIALS for k in materials):
         raise RuleError('材料状态无效')
@@ -69,5 +91,17 @@ def save_contact(state,action,universe,institutions):
     s=copy.deepcopy(state)
     contacts=s.setdefault('founder_contacts',{}).setdefault(cid,{})
     contacts[iid]=dict(id=iid,name=institutions[iid]['name'],stage=stage,note=note.strip(),updated_at=datetime.now(timezone.utc).isoformat())
+    s['founder_company']=cid;s['revision']+=1
+    return s
+
+def remove_contact(state,action,universe,institutions):
+    cid=action.get('company');iid=action.get('institution')
+    if not isinstance(cid,str) or not any(c['id']==cid for c in universe['companies']):raise RuleError('企业不存在')
+    if not isinstance(iid,str) or iid not in institutions:raise RuleError('机构不存在')
+    application=state.get('founder_rounds',{}).get(cid,{}).get('applications',{}).get(iid)
+    if application and application.get('status') not in ('rejected','declined'):
+        raise RuleError('该机构已有进行中的融资流程，不能移出名单')
+    s=copy.deepcopy(state)
+    s.setdefault('founder_contacts',{}).setdefault(cid,{}).pop(iid,None)
     s['founder_company']=cid;s['revision']+=1
     return s

@@ -9,6 +9,7 @@ with sync_playwright() as p:
     state=page.request.get('http://127.0.0.1:8790/api/game').json()['game']
     assert isinstance(state['companies'][0]['history'],dict)
     c=next(c for c in state['companies'] if not c['closed'])
+    page.locator('[data-discover=history]').click()
     page.locator('#search').fill(c['name'])
     page.locator('#marketRows [data-company="'+c['id']+'"]').first.click()
     expect(page.locator('#offerAmount')).to_be_visible(timeout=30000)
@@ -17,7 +18,6 @@ with sync_playwright() as p:
     expect(page.locator('#cash')).to_have_text('¥99,987,655')
     page.locator('[data-result-portfolio]').click()
     expect(page.locator('#positions')).to_contain_text('12,345')
-    page.locator('[data-view=journal]').click()
     assert page.locator('.capital-column').count()==2
     page.locator('.capital-column').first.click()
     expect(page.locator('#capitalReading')).to_contain_text('开户')

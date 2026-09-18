@@ -37,7 +37,28 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(public['positions'][cid]['legacy_assumption'])
         self.assertIsNone(public['curve'][-1]['unrealized'])
         self.assertEqual(public['positions'][cid]['cost'],100)
+    def test_predicted_financing_updates_position_each_month(self):
+        s=new_game(self.u);cid=next(c['id'] for c in self.u['companies'] if not c.get('closed'))
+        projection=dict(available=True,predicted=True,month_index=2,estimated_month='2026-05',
+            currency='CNY',predicted_amount=30000000,value_multiple=1.44,basis='同阶段',peer_count=20)
+        invested=apply(s,dict(type='offer',company=cid,amount=10000),self.u,projection=projection)
+        first=apply(invested,dict(type='advance'),self.u)
+        self.assertEqual(first['positions'][cid]['sim_value'],12000)
+        self.assertEqual(first['positions'][cid]['month_change'],2000)
+        self.assertTrue(first['notifications'])
+        self.assertEqual(first['notifications'][0]['date'],first['as_of'])
+        self.assertEqual(first['log'][-1]['amount'],2000)
+        self.assertEqual(first['log'][-1]['kind'],'projection')
+        second=apply(first,dict(type='advance'),self.u)
+        self.assertEqual(second['positions'][cid]['sim_value'],14400)
+        self.assertTrue(second['positions'][cid]['projection_complete'])
+        public=public_state(second,self.u)
+        self.assertEqual(public['positions'][cid]['sim_value'],14400)
+        self.assertEqual(public['curve'][-1]['sim_assets'],second['cash']+14400)
     def test_cannot_bypass_with_legacy_invest(self):
         with self.assertRaises(RuleError):apply(new_game(self.u),dict(type='invest'),self.u)
+    def test_removed_sparse_company_does_not_break_saved_founder_workspace(self):
+        s=new_game(self.u);s['founder_company']='removed_by_cleaning'
+        self.assertNotIn('founder_company',public_state(s,self.u))
 
 if __name__=='__main__':unittest.main()
