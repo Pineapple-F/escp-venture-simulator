@@ -11,3 +11,5 @@ node_modules/
 .idea/
 .vscode/
 edge-profile/
+model-runtime/research/enterprise_path_finance_knowledge/pretrained/FinBERT2-large/model.safetensors
+model-runtime/research/enterprise_path_finance_knowledge/pretrained/FinBERT2-large/pytorch_model.bin

@@ -12,7 +12,8 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[1]
-RESEARCH = Path(os.environ.get("ESCP_RESEARCH_ROOT", REPO.parent / "research"))
+RESEARCH = Path(os.environ.get(
+    "ESCP_RESEARCH_ROOT", REPO / "model-runtime" / "research"))
 FRAMEWORK = RESEARCH / "enterprise_path_framework_10x3"
 RUN = FRAMEWORK / "runs/20260915_165459"
 EPOCH = RUN / "iteration_07_event_frequency/epoch_02"

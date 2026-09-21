@@ -20,6 +20,8 @@
 
 脚本会首次创建 Python 虚拟环境、安装依赖并启动网站。打开 http://127.0.0.1:8790 。需要 Python 3.10 或更高版本。
 
+仓库同时包含事件预测的最佳权重、必要推理代码、匿名历史输入、金融语义缓存和投资人预测目录。FinBERT2-large 权重约 1.3GB，超过 GitHub 普通文件限制，会在首次使用预测功能时按固定版本自动下载。离线部署方法见 `model-runtime/README.md`。
+
 仓库包含 `processed/cleaned/` 匿名清洗数据和 `market-simulator/runtime/universe-v3.json` 运行快照；不包含本机账户数据库、虚拟环境及未匿名原始数据。账户记录会在首次运行后写入本机 `market-simulator/runtime/saves.sqlite3`。
 
 `demo/`、根目录 Dockerfile 和 Cloudflare 工作流仍是线上旧版入口，不影响本地运行 2.0。

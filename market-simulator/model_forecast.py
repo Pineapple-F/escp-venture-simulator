@@ -6,6 +6,7 @@ import json
 import os
 import selectors
 import subprocess
+import sys
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -31,11 +32,8 @@ class ModelForecast:
         self.worker = Path(worker)
         self.as_of = as_of
         self.companies = {item["id"]: item for item in companies}
-        repo = self.worker.resolve().parents[1]
-        research = repo.parent / "research"
         self.python = Path(python or os.environ.get(
-            "MODEL_PYTHON",
-            research / "enterprise_path_sequence/.venv_semantic/bin/python"))
+            "MODEL_PYTHON", sys.executable))
         self.timeout = float(timeout or os.environ.get("MODEL_TIMEOUT_SECONDS", "180"))
         self.process = None
         self.log_stream = None

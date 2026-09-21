@@ -22,7 +22,7 @@ if [[ ! -x .venv/bin/python ]]; then
   "$PYTHON_BIN" -m venv .venv
 fi
 
-if ! .venv/bin/python -c 'import duckdb' >/dev/null 2>&1; then
+if ! .venv/bin/python -c 'import duckdb,numpy,pandas,pyarrow,torch,transformers,huggingface_hub,safetensors' >/dev/null 2>&1; then
   .venv/bin/python -m pip install --upgrade pip
   .venv/bin/python -m pip install -r requirements.txt
 fi
