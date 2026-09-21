@@ -27,7 +27,7 @@ for item in UNIVERSE['rounds']:
 from institutions import build_index, candidates, pool
 INSTITUTIONS=build_index(UNIVERSE)
 from knowledge_graph import KnowledgeGraph
-from model_forecast import ModelForecast
+from model_forecast import ModelForecast, ModelInferenceError, ModelProcessError
 from forecast_catalog import ForecastCatalog
 from financial_projection import FinancialProjection
 from profiles import profile
@@ -48,6 +48,20 @@ for r in LATEST.values():
         PEERS[(r['industry'],r['stage'],r['currency'])].append((r['company'],r['amount']))
 DB=RUNTIME/'saves.sqlite3'
 with closing(sqlite3.connect(DB)) as c, c:c.execute('CREATE TABLE IF NOT EXISTS saves (id TEXT PRIMARY KEY, state TEXT NOT NULL)')
+
+def forecast_error(error, scenario=False):
+    """Return a useful public status without exposing internal paths or data."""
+    if isinstance(error, TimeoutError):
+        return ('生成时间超过限制，系统自动重试后仍未完成。请稍后重新生成。'
+                if scenario else '预测时间超过限制，请稍后重试。')
+    if isinstance(error, ModelProcessError):
+        return ('模型服务已经自动重启，本次路径尚未生成，请再次点击重新生成。'
+                if scenario else '模型服务已经自动重启，请重新预测。')
+    if isinstance(error, ModelInferenceError):
+        return ('融资方案已保存，但模型未能完成本次路径计算，请调整方案或稍后重试。'
+                if scenario else '模型未能完成本次预测，请稍后重试。')
+    return ('模型结果未通过完整性检查，请重新生成。'
+            if scenario else '模型结果未通过完整性检查，请重新预测。')
 
 def action_state(state):
     """Return changed account data without resending the immutable company universe."""
@@ -90,10 +104,10 @@ class Handler(BaseHTTPRequestHandler):
                 result['financial_projection']=FINANCIAL_PROJECTION.project(company,result,state['currency'])
                 return self.respond(200,result)
             except KeyError:return self.respond(404,{'error':'企业不存在'})
-            except (RuntimeError,TimeoutError,ValueError):
+            except (RuntimeError,TimeoutError,ValueError) as error:
                 import traceback
                 traceback.print_exc()
-                return self.respond(503,{'error':'模型暂时无法完成预测，请稍后重试'})
+                return self.respond(503,{'error':forecast_error(error)})
         if path=='/api/financing-scenario-forecast':
             with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
@@ -113,10 +127,10 @@ class Handler(BaseHTTPRequestHandler):
                 updated=MODEL_FORECAST.get_scenario(company,scenario['events'],scenario['as_of'])
                 return self.respond(200,{**scenario,'baseline':baseline,'forecast':updated})
             except KeyError:return self.respond(404,{'error':'企业不存在'})
-            except (RuntimeError,TimeoutError,ValueError):
+            except (RuntimeError,TimeoutError,ValueError) as error:
                 import traceback
                 traceback.print_exc()
-                return self.respond(503,{'error':'模型暂时无法生成融资后的发展路径，请稍后重试'})
+                return self.respond(503,{'error':forecast_error(error,scenario=True)})
         if path=='/api/custom-event-types':
             with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})

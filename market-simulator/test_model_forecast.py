@@ -2,7 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from model_forecast import EXPECTED_EVENTS, ModelForecast
+from model_forecast import (
+    EXPECTED_EVENTS, ModelForecast, ModelInferenceError, ModelProcessError,
+)
 
 
 def live_result(company="co_a"):
@@ -72,6 +74,26 @@ class FakeForecast(ModelForecast):
         return self.response
 
 
+class TransportForecast(ModelForecast):
+    def __init__(self, outcomes):
+        temp = tempfile.NamedTemporaryFile()
+        self._temp = temp
+        super().__init__(temp.name, [{"id": "co_a", "closed": False}],
+                         "2026-03-31", python=temp.name)
+        self.outcomes = list(outcomes)
+        self.transport_calls = 0
+
+    def _request_worker_once(self, payload):
+        self.transport_calls += 1
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    def close(self):
+        self.process = None
+
+
 class ModelForecastTest(unittest.TestCase):
     def test_warm_starts_available_worker(self):
         forecast = FakeForecast()
@@ -133,6 +155,26 @@ class ModelForecastTest(unittest.TestCase):
         self.assertEqual(forecast.calls, 1)
         self.assertEqual(forecast.last_payload["op"], "scenario")
         self.assertEqual(forecast.last_payload["reference_cutoff"], "2026-03-31")
+
+    def test_scenario_retries_one_interrupted_worker_request(self):
+        forecast = TransportForecast([
+            ModelProcessError("worker stopped"), scenario_result(),
+        ])
+        result = forecast._request_worker({"op": "scenario"})
+        self.assertEqual(result["mode"], "financing_scenario_inference")
+        self.assertEqual(forecast.transport_calls, 2)
+
+    def test_scenario_does_not_retry_deterministic_inference_error(self):
+        forecast = TransportForecast([ModelInferenceError("invalid input")])
+        with self.assertRaises(ModelInferenceError):
+            forecast._request_worker({"op": "scenario"})
+        self.assertEqual(forecast.transport_calls, 1)
+
+    def test_regular_forecast_does_not_retry_transport_error(self):
+        forecast = TransportForecast([ModelProcessError("worker stopped")])
+        with self.assertRaises(ModelProcessError):
+            forecast._request_worker({"company": "co_a"})
+        self.assertEqual(forecast.transport_calls, 1)
 
     def test_closed_company_is_not_predicted(self):
         forecast = FakeForecast(companies=[{"id": "co_a", "closed": True}])

@@ -16,6 +16,14 @@ EXPECTED_EVENTS = (
 )
 
 
+class ModelProcessError(RuntimeError):
+    """The local worker stopped or returned an unreadable transport response."""
+
+
+class ModelInferenceError(RuntimeError):
+    """The worker completed the request but could not run the inference."""
+
+
 class ModelForecast:
     """Run one retained model against each company's complete dated history."""
 
@@ -82,7 +90,7 @@ class ModelForecast:
             self.log_stream.close()
             self.log_stream = None
 
-    def _request_worker(self, payload):
+    def _request_worker_once(self, payload):
         self._start()
         try:
             self.process.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
@@ -95,17 +103,33 @@ class ModelForecast:
             line = self.process.stdout.readline()
         except (BrokenPipeError, OSError):
             self.close()
-            raise RuntimeError("模型推理进程已停止") from None
+            raise ModelProcessError("模型推理进程已停止") from None
         finally:
             if "selector" in locals():
                 selector.close()
         if not line:
             self.close()
-            raise RuntimeError("模型推理进程未返回结果")
-        response = json.loads(line)
+            raise ModelProcessError("模型推理进程未返回结果")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError:
+            self.close()
+            raise ModelProcessError("模型推理进程返回了无效结果") from None
         if not response.get("ok"):
-            raise RuntimeError(response.get("error") or "模型推理失败")
+            raise ModelInferenceError(response.get("error") or "模型推理失败")
         return response["result"]
+
+    def _request_worker(self, payload):
+        """Retry one interrupted custom/scenario request with a fresh worker."""
+        retryable = payload.get("op") in {"custom", "scenario"}
+        attempts = 2 if retryable else 1
+        for attempt in range(attempts):
+            try:
+                return self._request_worker_once(payload)
+            except (ModelProcessError, TimeoutError):
+                if attempt + 1 == attempts:
+                    raise
+                self.close()
 
     @staticmethod
     def _validate(result, company, as_of, mode="live_full_history_inference"):

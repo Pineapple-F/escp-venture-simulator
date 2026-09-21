@@ -101,11 +101,15 @@ class FinancialLookup:
         self.last_cached = 0
         self.last_encoded = 0
 
+    def warm(self):
+        """Load the semantic encoder before the first user-authored event arrives."""
+        if self.encoder is None:
+            self.encoder = FinancialTextEncoder(str(self.device))
+
     def encode(self, texts):
         unique_missing = list(dict.fromkeys(text for text in texts if text not in self.vectors))
         if unique_missing:
-            if self.encoder is None:
-                self.encoder = FinancialTextEncoder(str(self.device))
+            self.warm()
             vectors = self.encoder.encode(unique_missing)
             self.vectors.update(zip(unique_missing, vectors))
         self.last_encoded = len(unique_missing)
@@ -150,6 +154,12 @@ class Worker:
         self.history_cutoff = None
         self.live_history_added = 0
         self.lookup = FinancialLookup(self.device)
+        # Historical nodes normally hit the precomputed vector cache, while a
+        # financing plan contains new amounts and institution names. Loading the
+        # encoder here keeps that first scenario request from paying the cold-start
+        # cost or failing while the large language model is being initialized.
+        if os.environ.get("MODEL_PRELOAD_SEMANTIC", "1") != "0":
+            self.lookup.warm()
         self.collator = UnifiedCollator(self.lookup)
 
     def extend_histories(self, cutoff):
