@@ -1,6 +1,7 @@
 """Exercise the deployed frontend, cookie session and revision protection."""
 import argparse
 import http.cookiejar
+import http.client
 import json
 import time
 import urllib.error
@@ -30,7 +31,7 @@ def main():
             assert health['ok']
             if args.storage: assert health.get('storage') == args.storage, health
             break
-        except (urllib.error.URLError, TimeoutError, AssertionError) as error:
+        except (OSError, http.client.HTTPException, AssertionError) as error:
             if attempt == args.attempts-1: raise
             print(f'Waiting for container provisioning ({attempt+1}/{args.attempts}): {type(error).__name__}', flush=True)
             time.sleep(10)

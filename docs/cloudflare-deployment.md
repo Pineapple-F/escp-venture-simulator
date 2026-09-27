@@ -31,6 +31,8 @@
 4. 保证 `actscal.org` 在相同账号中启用；配置已声明 `venturesimulator.actscal.org` 为 Worker 自定义域名。
 5. 在 [Actions](https://github.com/Pineapple-F/escp-venture-simulator/actions) 运行 **Verify and deploy ESCP**，选择需要发布的分支，勾选 `publish`。以后推送 `main` 会自动验证并发布；`deploy/**` 分支默认只验证。
 
+支付方式在 **Manage Account → Billing → Subscriptions** 中设置。官方支持银行卡、PayPal 等方式，具体可用选项以你的结算页为准；账单按美元计价，税费和换汇由结算页及支付机构决定。用量可以在 **Billing → Billable Usage** 查看，预算通知只提醒，不是自动停机或消费硬上限。参见 [账单与支付说明](https://developers.cloudflare.com/billing/) 和 [账单界面更新](https://developers.cloudflare.com/changelog/post/2026-05-21-modernised-billing-profile/)。
+
 工作流依次执行存档/业务测试、当前前端构建、Worker 校验、linux/amd64 镜像构建、6GiB/1CPU 环境的页面与模型加载测试、Worker 与容器存储联调、Cloudflare 权限预检、正式发布和线上验收。GitHub runner 自带 Docker，因此不要求你电脑一直开着。
 
 首次构建需下载约 1.3GB 的固定版本 FinBERT 权重；首次容器部署也需要等待平台分配资源。不要仅根据 Worker URL 能打开就认为模型和数据库已验收。
