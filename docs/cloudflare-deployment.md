@@ -1,6 +1,6 @@
 # ESCP Cloudflare 部署
 
-核对日期：2026-09-27。目标域名：`https://venturesimulator.actscal.org`。
+更新日期：2026-09-28。部署分支：`main`。目标地址：`https://escp-venture-simulator.<账号子域名>.workers.dev`，实际网址见 GitHub Actions 的 Summary。
 
 ## 本次方案
 
@@ -25,15 +25,15 @@
 
 ## 你需要在账号中完成的事
 
-1. 登录 Cloudflare，选择域名及项目所在账号，在 **Workers & Pages / Workers 订阅** 中开通 **Workers Paid（5 美元/月起）**。这是账号级 Workers 套餐，不是域名的 Pro 套餐，也不需要 Workers AI。付款前以结算页为准；本次代码修改不会替你购买套餐。
-2. 创建或调整部署 API Token，限定到项目账号和 `actscal.org` 区域。需要账号级 **Workers Scripts: Edit、Containers: Edit、Account Settings: Read**；自定义域名还需要相应区域的 **Workers Routes: Edit、Zone: Read**。有些 API 界面将 Edit 显示为 Write。不要使用 Global API Key。
+1. 登录 Cloudflare，选择项目所在账号，在 **Workers & Pages / Workers 订阅** 中开通 **Workers Paid（5 美元/月起）**。这是账号级 Workers 套餐，不是域名的 Pro 套餐，也不需要 Workers AI。付款前以结算页为准；部署脚本不会替你购买套餐。
+2. 创建或调整部署 API Token，限定到项目账号。需要账号级 **Workers Scripts: Edit、Containers: Edit、Account Settings: Read**，不需要为默认地址添加任何域名区域权限。有些 API 界面将 Edit 显示为 Write。不要使用 Global API Key。
 3. 打开 [GitHub Actions Secrets](https://github.com/Pineapple-F/escp-venture-simulator/settings/secrets/actions)，确认 `CLOUDFLARE_ACCOUNT_ID` 对应该账号，更新 `CLOUDFLARE_API_TOKEN`。无需把密钥发在对话里。现有 `DEEPSEEK_KEY` 不用于当前这套 Python 网站部署。
-4. 保证 `actscal.org` 在相同账号中启用；配置已声明 `venturesimulator.actscal.org` 为 Worker 自定义域名。
-5. 在 [Actions](https://github.com/Pineapple-F/escp-venture-simulator/actions) 运行 **Verify and deploy ESCP**，选择需要发布的分支，勾选 `publish`。以后推送 `main` 会自动验证并发布；`deploy/**` 分支默认只验证。
+4. 无需购买域名或添加区域。配置启用 `workers_dev`，预检脚本读取该账号现有子域名；仅当 Cloudflare 明确报告未注册时，自动注册 `escp-<账号哈希前12位>.workers.dev`，不更改已有子域名。默认域名规则见 [官方文档](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)。
+5. 推送 `main` 会自动验证并发布。也可在 [Actions](https://github.com/Pineapple-F/escp-venture-simulator/actions) 运行 **Verify and deploy ESCP**，选择 `main`，勾选 `publish`。其他分支不会发布；PR 只验证。Actions 的 Summary 会显示目标网址，只有容器任务完成线上验收才算部署成功。
 
 支付方式在 **Manage Account → Billing → Subscriptions** 中设置。官方支持银行卡、PayPal 等方式，具体可用选项以你的结算页为准；账单按美元计价，税费和换汇由结算页及支付机构决定。用量可以在 **Billing → Billable Usage** 查看，预算通知只提醒，不是自动停机或消费硬上限。参见 [账单与支付说明](https://developers.cloudflare.com/billing/) 和 [账单界面更新](https://developers.cloudflare.com/changelog/post/2026-05-21-modernised-billing-profile/)。
 
-工作流依次执行存档/业务测试、当前前端构建、Worker 校验、linux/amd64 镜像构建、6GiB/1CPU 环境的页面与模型加载测试、Worker 与容器存储联调、Cloudflare 权限预检、正式发布和线上验收。GitHub runner 自带 Docker，因此不要求你电脑一直开着。
+发布时先检查 Cloudflare 权限并准备默认地址，再执行存档/业务测试、当前前端构建、Worker 校验、linux/amd64 镜像构建、6GiB/1CPU 环境的页面与模型加载测试、Worker 与容器存储联调、正式发布和线上验收。GitHub runner 自带 Docker，因此不要求你电脑一直开着。
 
 首次构建需下载约 1.3GB 的固定版本 FinBERT 权重；首次容器部署也需要等待平台分配资源。不要仅根据 Worker URL 能打开就认为模型和数据库已验收。
 
@@ -81,7 +81,7 @@ npm run dev
 ```sh
 npx wrangler containers list
 npx wrangler containers images list
-python scripts/smoke_test.py https://venturesimulator.actscal.org --storage durable-object
+python scripts/smoke_test.py https://escp-venture-simulator.<账号子域名>.workers.dev --storage durable-object
 ```
 
 验收脚本会创建一个名为 `Deployment smoke test` 的测试账户，检查创建、读取、更新与旧版本写入冲突。仅检查页面可加 `--read-only`。

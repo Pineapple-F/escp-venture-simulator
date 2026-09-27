@@ -2,12 +2,12 @@ name: Verify and deploy ESCP
 
 on:
   push:
-    branches: [main, 'deploy/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish to the configured Cloudflare domain after validation'
+        description: 'Publish main to the current account workers.dev address after validation'
         type: boolean
         default: true
 
@@ -15,19 +15,28 @@ permissions:
   contents: read
 
 concurrency:
-  group: escp-${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish)) && 'production' || github.ref }}
+  group: escp-${{ github.ref == 'refs/heads/main' && 'production' || github.ref }}
   cancel-in-progress: false
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      deploy_url: ${{ steps.cloudflare.outputs.url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
+      - name: Check Cloudflare access and prepare default address
+        id: cloudflare
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/cloudflare_preflight.mjs
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -50,6 +59,7 @@ jobs:
     timeout-minutes: 40
     env:
       WRANGLER_SEND_METRICS: 'false'
+      DEPLOY_URL: ${{ needs.verify.outputs.deploy_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -89,18 +99,14 @@ jobs:
             sleep 2
           done
           wait "$smoke_pid"
-      - name: Check Cloudflare access
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/cloudflare_preflight.mjs
       - name: Deploy frontend and container
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --no-install wrangler deploy
       - name: Verify live deployment
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
-        run: python scripts/smoke_test.py https://venturesimulator.actscal.org --storage durable-object
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+        run: |
+          python scripts/smoke_test.py "$DEPLOY_URL" --storage durable-object
+          printf 'Deployment verified: [%s](%s)\n' "$DEPLOY_URL" "$DEPLOY_URL" >> "$GITHUB_STEP_SUMMARY"

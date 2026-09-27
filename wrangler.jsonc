@@ -31,10 +31,5 @@
       "storage": "sqlite"
     }
   },
-  "routes": [
-    {
-      "pattern": "venturesimulator.actscal.org",
-      "custom_domain": true
-    }
-  ]
+  "workers_dev": true
 }
