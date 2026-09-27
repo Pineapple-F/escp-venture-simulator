@@ -1,22 +1,96 @@
-name: Deploy to Cloudflare
+name: Verify and deploy ESCP
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'deploy/**']
+  pull_request:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to the configured Cloudflare domain after validation'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: escp-${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish)) && 'production' || github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Worker dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Deploy simulator
-        uses: cloudflare/wrangler-action@v3
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
-          wranglerVersion: "4.129.1"
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - run: python -m pip install duckdb==1.5.5
+      - name: Test storage and business logic
+        run: |
+          npm test
+          cd market-simulator
+          python -m unittest test_save_store test_evidence test_financing test_founder test_forecast_workflow test_financing_scenario
+      - name: Build current frontend and validate Worker
+        run: |
+          npm run build
+          npm run check:worker
+
+  container:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Build linux/amd64 image
+        run: docker build --platform linux/amd64 -t escp-ci:${{ github.sha }} .
+      - name: Test Python container and model assets
+        run: |
+          docker run -d --name escp-ci --memory=6g --cpus=1 -p 127.0.0.1:8080:8080 -e COOKIE_SECURE=0 escp-ci:${{ github.sha }}
+          python scripts/smoke_test.py http://127.0.0.1:8080 --storage sqlite
+          docker exec escp-ci python -c "import pathlib,sys; sys.path.insert(0,'/app/scripts'); from live_model_worker import Worker; w=Worker(); w.lookup.warm(); v=w.lookup.encoder.encode(['企业完成一轮融资']); assert v.shape[0]==1; print('PASS: event model and FinBERT loaded on CPU')"
+      - name: Stop test container
+        if: always()
+        run: |
+          docker logs escp-ci || true
+          docker rm -f escp-ci || true
+      - name: Test Worker, container and durable storage together
+        run: |
+          npx --no-install wrangler dev --ip 127.0.0.1 --port 8787 --var COOKIE_SECURE:0 > "$RUNNER_TEMP/escp-worker.log" 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/escp-worker.log"' EXIT
+          python scripts/smoke_test.py http://127.0.0.1:8787 --storage durable-object
+      - name: Check Cloudflare access
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/cloudflare_preflight.mjs
+      - name: Deploy frontend and container
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --no-install wrangler deploy
+      - name: Verify live deployment
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        run: python scripts/smoke_test.py https://venturesimulator.actscal.org --storage durable-object

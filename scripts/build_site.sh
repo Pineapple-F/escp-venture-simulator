@@ -3,8 +3,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-rm -rf public
-mkdir -p public/processed
-cp -r demo/* public/
-cp processed/patchtst_metrics.csv public/processed/
-echo "public/ assembled: $(du -sh public | cut -f1)"
+python3 scripts/build_site.py

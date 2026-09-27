@@ -1,6 +1,16 @@
 {
   "name": "escp-venture-simulator",
   "private": true,
+  "scripts": {
+    "build": "python scripts/build_site.py",
+    "dev": "npm run build && wrangler dev --var COOKIE_SECURE:0",
+    "test": "node --test worker/*.test.mjs",
+    "check:worker": "wrangler deploy --dry-run --containers-rollout=none --outdir .wrangler/dry-run",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.131.2"
+  },
   "dependencies": {
     "@cloudflare/containers": "0.3.7"
   }

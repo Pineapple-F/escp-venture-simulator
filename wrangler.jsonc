@@ -3,6 +3,12 @@
   "name": "escp-venture-simulator",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-27",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
   "containers": [
     {
       "class_name": "VentureSimulatorV2",

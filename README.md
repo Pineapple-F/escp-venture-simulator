@@ -24,4 +24,6 @@
 
 仓库包含 `processed/cleaned/` 匿名清洗数据和 `market-simulator/runtime/universe-v3.json` 运行快照；不包含本机账户数据库、虚拟环境及未匿名原始数据。账户记录会在首次运行后写入本机 `market-simulator/runtime/saves.sqlite3`。
 
-线上入口 `https://venturesimulator.actscal.org/` 由 Cloudflare Worker 转发到 Python Container。根目录 Dockerfile 打包 `market-simulator/`、匿名运行数据和固定版本预测模型；推送 `main` 后由 GitHub Actions 自动构建并发布。
+Cloudflare 部署配置面向 `https://venturesimulator.actscal.org/`：现有前端由 Workers Static Assets 托管，`/api/*` 转发到 Python Container。线上账户存档保存在 Durable Object SQLite 中，容器重建不会依赖本地存档文件恢复；本地运行仍使用 SQLite 文件。当前不需要另外部署 MySQL。
+
+根目录 Dockerfile 打包网站、匿名数据与固定版本预测模型。推送 `main` 后由 GitHub Actions 自动测试、构建和发布；部署成功需以 Actions 及线上验收为准。账号开通、权限、价格和操作步骤见 [Cloudflare 部署说明](docs/cloudflare-deployment.md)。

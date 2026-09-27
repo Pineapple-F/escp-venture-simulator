@@ -12,5 +12,15 @@ __pycache__
 .DS_Store
 docs
 public
+node_modules
+.wrangler
+.github
+**/.pytest_cache
+**/test_*.py
+**/*.sqlite3
+**/*.sqlite3-*
+**/model.safetensors
+**/pytorch_model.bin
+**/pretrained/**/.cache
 market-simulator/runtime/saves.sqlite3
 market-simulator/runtime/model-worker.log

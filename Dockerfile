@@ -9,6 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MODEL_DEVICE=cpu \
     MODEL_CPU_THREADS=1 \
     MODEL_PRELOAD_SEMANTIC=0 \
+    MODEL_WARM_ON_START=0 \
     MODEL_ALLOW_DOWNLOAD=0
 
 WORKDIR /app/market-simulator
@@ -30,6 +31,7 @@ snapshot_download(
     repo_id="valuesimplex-ai-lab/FinBERT2-large",
     revision="5928de1860ce5eb5f1f2dd23c08d2b9dcc1b0686",
     local_dir="/app/model-runtime/research/enterprise_path_finance_knowledge/pretrained/FinBERT2-large",
+    allow_patterns=["*.json", "*.txt", "model.safetensors", "tokenizer.model"],
 )
 PY
 RUN rm -f /app/market-simulator/runtime/saves.sqlite3 \
@@ -39,5 +41,8 @@ ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=4)" || exit 1
 
 CMD ["python", "server.py"]
