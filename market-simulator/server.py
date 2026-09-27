@@ -79,7 +79,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length',str(len(body)));self.send_header('Cache-Control','no-store')
         if compressed:self.send_header('Content-Encoding','gzip')
         self.send_header('Vary','Accept-Encoding')
-        if cookie:self.send_header('Set-Cookie',f'market_save={cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000')
+        if cookie:
+            secure='; Secure' if os.environ.get('COOKIE_SECURE')=='1' else ''
+            self.send_header('Set-Cookie',f'market_save={cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000{secure}')
         self.end_headers();self.wfile.write(body)
 
     def session(self):
@@ -88,6 +90,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path=urlparse(self.path).path
+        if path=='/api/health':
+            return self.respond(200,{'ok':True,'service':'venture-simulator'})
         if path=='/api/model-forecast':
             with closing(sqlite3.connect(DB)) as c, c:row=c.execute('SELECT state FROM saves WHERE id=?',(self.session(),)).fetchone()
             if not row:return self.respond(401,{'error':'请先建立账户'})
@@ -345,5 +349,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__=='__main__':
     port=int(os.environ.get('MARKET_PORT','8790'))
-    print(f'Market simulator: http://127.0.0.1:{port}',flush=True)
-    ThreadingHTTPServer(('127.0.0.1',port),Handler).serve_forever()
+    host=os.environ.get('MARKET_HOST','127.0.0.1')
+    print(f'Market simulator: http://{host}:{port}',flush=True)
+    ThreadingHTTPServer((host,port),Handler).serve_forever()

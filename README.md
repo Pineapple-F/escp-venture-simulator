@@ -24,4 +24,4 @@
 
 仓库包含 `processed/cleaned/` 匿名清洗数据和 `market-simulator/runtime/universe-v3.json` 运行快照；不包含本机账户数据库、虚拟环境及未匿名原始数据。账户记录会在首次运行后写入本机 `market-simulator/runtime/saves.sqlite3`。
 
-`demo/`、根目录 Dockerfile 和 Cloudflare 工作流仍是线上旧版入口，不影响本地运行 2.0。
+线上入口 `https://venturesimulator.actscal.org/` 由 Cloudflare Worker 转发到 Python Container。根目录 Dockerfile 打包 `market-simulator/`、匿名运行数据和固定版本预测模型；推送 `main` 后由 GitHub Actions 自动构建并发布。

@@ -2,7 +2,15 @@
 .gitignore
 .env
 .venv
+**/.venv
+**/.venv/**
 __pycache__
+**/__pycache__
+**/__pycache__/**
 *.pyc
 *.log
 .DS_Store
+docs
+public
+market-simulator/runtime/saves.sqlite3
+market-simulator/runtime/model-worker.log
