@@ -78,7 +78,17 @@ jobs:
           npx --no-install wrangler dev --ip 127.0.0.1 --port 8787 --var COOKIE_SECURE:0 > "$RUNNER_TEMP/escp-worker.log" 2>&1 &
           worker_pid=$!
           trap 'kill "$worker_pid" 2>/dev/null || true; cat "$RUNNER_TEMP/escp-worker.log"' EXIT
-          python scripts/smoke_test.py http://127.0.0.1:8787 --storage durable-object
+          python scripts/smoke_test.py http://127.0.0.1:8787 --storage durable-object &
+          smoke_pid=$!
+          while kill -0 "$smoke_pid" 2>/dev/null; do
+            if ! kill -0 "$worker_pid" 2>/dev/null; then
+              kill "$smoke_pid" 2>/dev/null || true
+              echo 'Worker exited before the integration check completed'
+              exit 1
+            fi
+            sleep 2
+          done
+          wait "$smoke_pid"
       - name: Check Cloudflare access
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish)
         env:

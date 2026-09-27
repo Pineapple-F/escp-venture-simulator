@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "escp-venture-simulator",
   "main": "worker/index.js",
-  "compatibility_date": "2026-09-27",
+  "compatibility_date": "2026-09-18",
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
