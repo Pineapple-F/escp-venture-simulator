@@ -95,6 +95,15 @@ class TransportForecast(ModelForecast):
 
 
 class ModelForecastTest(unittest.TestCase):
+    def test_recent_supported_history_is_validated(self):
+        result = live_result()
+        result.update(all_history=False, history_scope='recent_supported_events_up_to_64',
+                      model_input_nodes=12)
+        self.assertEqual(FakeForecast(response=result).get('co_a')['model_input_nodes'], 12)
+        result['model_input_nodes'] = 65
+        with self.assertRaises(ValueError):
+            FakeForecast(response=result).get('co_a')
+
     def test_warm_starts_available_worker(self):
         forecast = FakeForecast()
         started = []

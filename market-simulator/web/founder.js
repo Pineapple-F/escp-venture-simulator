@@ -161,12 +161,12 @@ function renderModelForecast(result){
   $('#otherEventActions').hidden=!otherPredicted.length;
   $('#otherEventCount').textContent=otherPredicted.length+' 项';
   const recent=result.recent_history||[];
-  $('#modelMeta').innerHTML='<div class="model-meta"><dl><div><dt>历史输入</dt><dd>'+esc(result.history_nodes)+' 个事件 · '+esc(result.history_start)+' 至 '+esc(result.history_end)+'</dd></div><div><dt>预测区间</dt><dd>'+esc(result.horizon_start)+' 至 '+esc(result.horizon_end)+'</dd></div><div><dt>模型版本</dt><dd>'+esc(result.model)+'</dd></div></dl>'+(recent.length?'<details><summary>最近5个历史事件</summary><ol class="recent-history">'+recent.map(x=>'<li><time>'+esc(x.date)+'</time><span>'+esc(x.event)+'</span></li>').join('')+'</ol></details>':'')+(absent.length?'<details><summary>其他事件（'+absent.length+'）</summary><p>'+absent.map(x=>esc(x.event)).join('、')+'</p></details>':'')+'</div>';
+  $('#modelMeta').innerHTML='<div class="model-meta"><dl><div><dt>预测参考</dt><dd>最近 '+esc(result.model_input_nodes??result.history_nodes)+' 个可用于预测的事件 · 历史记录共 '+esc(result.history_nodes)+' 个</dd></div><div><dt>预测区间</dt><dd>'+esc(result.horizon_start)+' 至 '+esc(result.horizon_end)+'</dd></div></dl>'+(recent.length?'<details><summary>最近5个历史事件</summary><ol class="recent-history">'+recent.map(x=>'<li><time>'+esc(x.date)+'</time><span>'+esc(x.event)+'</span></li>').join('')+'</ol></details>':'')+(absent.length?'<details><summary>其他事件（'+absent.length+'）</summary><p>'+absent.map(x=>esc(x.event)).join('、')+'</p></details>':'')+'</div>';
   renderDatasetPath(result);renderActionSnapshot();
 }
 async function loadModelForecast(){
   const id=company.id,ticket=++modelRequest;
-  $('#modelStatus').textContent='正在整理全部历史并运行模型，首次预测需要加载金融语义模型…';$('#modelSummary').innerHTML='';$('#modelResults').innerHTML='';$('#modelPlans').innerHTML='';$('#otherEventActions').hidden=true;$('#modelMeta').innerHTML='';
+  $('#modelStatus').textContent='正在整理历史并生成预测…';$('#modelSummary').innerHTML='';$('#modelResults').innerHTML='';$('#modelPlans').innerHTML='';$('#otherEventActions').hidden=true;$('#modelMeta').innerHTML='';
   try{
     const result=await api('/api/model-forecast?id='+encodeURIComponent(id));
     if(ticket!==modelRequest||company.id!==id)return;
@@ -361,7 +361,7 @@ async function loadFinancingScenario(force=false){
   const key=company.id+':'+account.revision;
   if(!force&&scenarioLoadedKey===key)return;
   const id=company.id,ticket=++scenarioRequest;
-  $('#scenarioStatus').innerHTML='<b>正在生成新的未来路径…</b><p>模型正在读取企业完整历史、融资准备和已选机构。</p>';
+  $('#scenarioStatus').innerHTML='<b>正在生成新的未来路径…</b><p>正在根据近期事件和融资方案生成预测。</p>';
   $('#scenarioInputs').innerHTML='';$('#scenarioComparison').innerHTML='';$('#scenarioPath').innerHTML='';$('#scenarioRefresh').disabled=true;
   try{
     const result=await api('/api/financing-scenario-forecast?id='+encodeURIComponent(id));

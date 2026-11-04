@@ -17,6 +17,7 @@ node_modules
 .github
 **/.pytest_cache
 **/test_*.py
+!market-simulator/test_hotpp_website.py
 **/*.sqlite3
 **/*.sqlite3-*
 **/model.safetensors

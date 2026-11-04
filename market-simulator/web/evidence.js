@@ -76,7 +76,7 @@ showReport=function(previous){
   $('#reportDialog').showModal();
 };
 rules=function(){
-  $('#rulesBody').innerHTML='<p>历史资料截止 '+game.meta.cutoff+'，融资金额按原始币种展示。</p><p>未来融资事件由企业完整历史预测；融资金额与估值变化参考截止日前同阶段、同行业企业的历史记录。</p><p>人民币和美元分别估算，不自动换汇。旧账户记录可<a href="/api/legacy-export" download="original-account.json">下载</a>。</p>';
+  $('#rulesBody').innerHTML='<p>历史资料截止 '+game.meta.cutoff+'，融资金额按原始币种展示。</p><p>未来融资事件参考企业近期历史预测；融资金额与估值变化参考截止日前同阶段、同行业企业的历史记录。</p><p>人民币和美元分别估算，不自动换汇。旧账户记录可<a href="/api/legacy-export" download="original-account.json">下载</a>。</p>';
   $('#rulesDialog').showModal();
 };
 $('#rulesBtn').onclick=rules;

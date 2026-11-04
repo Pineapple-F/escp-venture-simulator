@@ -108,6 +108,7 @@ class ForecastCatalog:
                 "matched_event": matched,
                 "predicted_events": predicted,
                 "history_nodes": prediction.get("history_nodes"),
+                "model_input_nodes": prediction.get("model_input_nodes", prediction.get("history_nodes")),
                 "history_end": prediction.get("history_end"),
             })
         rows.sort(key=lambda row: (row["matched_event"]["month_index"],

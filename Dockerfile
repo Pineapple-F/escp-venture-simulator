@@ -21,19 +21,10 @@ RUN pip install --no-cache-dir \
 
 COPY market-simulator/ /app/market-simulator/
 COPY scripts/live_model_worker.py /app/scripts/live_model_worker.py
+COPY scripts/live_hotpp_worker.py /app/scripts/live_hotpp_worker.py
+COPY scripts/hotpp_website/ /app/scripts/hotpp_website/
 COPY model-runtime/ /app/model-runtime/
 COPY processed/cleaned/ /app/processed/cleaned/
-RUN --mount=type=cache,target=/root/.cache/huggingface \
-    rm -f /app/model-runtime/research/enterprise_path_finance_knowledge/pretrained/FinBERT2-large/model.safetensors && \
-    HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 python - <<'PY'
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="valuesimplex-ai-lab/FinBERT2-large",
-    revision="5928de1860ce5eb5f1f2dd23c08d2b9dcc1b0686",
-    local_dir="/app/model-runtime/research/enterprise_path_finance_knowledge/pretrained/FinBERT2-large",
-    allow_patterns=["*.json", "*.txt", "model.safetensors", "tokenizer.model"],
-)
-PY
 RUN rm -f /app/market-simulator/runtime/saves.sqlite3 \
           /app/market-simulator/runtime/model-worker.log
 

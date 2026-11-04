@@ -32,11 +32,11 @@ from financial_projection import FinancialProjection
 from profiles import profile
 KNOWLEDGE_GRAPH=KnowledgeGraph(UNIVERSE,INSTITUTIONS,profile_loader=profile)
 MODEL_FORECAST=ModelForecast(
-    ROOT.parent/'scripts/live_model_worker.py',UNIVERSE['companies'],UNIVERSE['start'])
+    ROOT.parent/'scripts/live_hotpp_worker.py',UNIVERSE['companies'],UNIVERSE['start'])
 if os.environ.get('MODEL_WARM_ON_START','1') == '1':
     MODEL_FORECAST.warm()
 FORECAST_CATALOG=ForecastCatalog(
-    RUNTIME/f'investor-forecast-catalog-{UNIVERSE["start"]}.json',UNIVERSE['start'])
+    RUNTIME/f'investor-forecast-catalog-hotpp-{UNIVERSE["start"]}.json',UNIVERSE['start'])
 FINANCIAL_PROJECTION=FinancialProjection(UNIVERSE)
 from collections import defaultdict
 from statistics import median

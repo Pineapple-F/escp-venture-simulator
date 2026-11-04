@@ -13,7 +13,7 @@
       <section class="panel custom-intro"><div><p class="eyebrow">自建企业 · 标准事件路径</p><h2>我的历史发展路径</h2><p>选择日期、事件大类和具体事件，系统自动形成企业事件序列。</p></div><span>我的企业</span></section>
       <form id="customProfileForm" class="custom-profile"><label>企业名称<input name="name" maxlength="80" required placeholder="例如：远航科技"></label><label>所属行业（可选）<input name="industry" maxlength="80" placeholder="用于相似企业排序"></label><label>所在地区（可选）<input name="region" maxlength="80" placeholder="例如：上海"></label><button type="submit">保存企业信息</button><span id="customProfileStatus" role="status"></span></form>
       <section class="path-builder"><div class="path-builder-heading"><div><h2>添加历史事件</h2><p>按时间排列企业已经发生的关键事件。</p></div><b id="customEventCount">0 个事件</b></div><form id="customEventForm"><label>发生日期<input name="date" type="date" required></label><label>事件大类<select name="category" id="customCategory" required></select></label><label>具体事件<select name="subtype" id="customSubtype" required></select></label><button type="submit">加入路径 ＋</button></form><div class="path-legend"><span class="fact">历史事实</span><span class="prediction">模型预测</span><span class="plan">用户计划</span></div><div id="customTimeline"></div></section>
-      <section class="custom-run"><div><h2>预测未来一年</h2><p>模型读取上方全部历史事件，同时从历史数据中检索可比企业。</p></div><button id="customPredict" type="button">开始预测 →</button><span id="customPredictStatus" role="status"></span></section>
+      <section class="custom-run"><div><h2>预测未来一年</h2><p>预测参考最近的历史事件，同时从历史数据中检索可比企业。</p></div><button id="customPredict" type="button">开始预测 →</button><span id="customPredictStatus" role="status"></span></section>
       <div id="customForecastResults"></div><div id="customSimilarResults"></div>
     </section>
     <section id="customActionsSection" hidden>

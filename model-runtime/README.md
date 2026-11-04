@@ -1,6 +1,6 @@
 # 模型运行包
 
-本目录包含网站事件预测所需的最佳模型权重、推理代码、匿名历史输入和金融语义缓存。
+本目录包含网站事件预测所需的权重、推理代码和匿名历史输入。`hotpp_website/` 为当前预测运行包；旧研究模型及其缓存保留作为历史记录。
 
 ## GitHub 中未包含的文件
 
@@ -11,7 +11,7 @@ model-runtime/research/enterprise_path_finance_knowledge/
   pretrained/FinBERT2-large/model.safetensors
 ```
 
-首次运行 `./start.sh` 并调用预测功能时，程序会从以下固定版本自动下载该文件：
+以下为旧研究模型所需文件，当前网站预测不需要下载。旧版本使用的固定来源为：
 
 - 模型：`valuesimplex-ai-lab/FinBERT2-large`
 - revision：`5928de1860ce5eb5f1f2dd23c08d2b9dcc1b0686`

@@ -131,9 +131,19 @@ class ModelForecast:
 
     @staticmethod
     def _validate(result, company, as_of, mode="live_full_history_inference"):
-        if (result.get("mode") != mode or
+        history_scope_valid = result.get("all_history") is True or (
+            result.get("all_history") is False and
+            result.get("history_scope") == "recent_supported_events_up_to_64" and
+            type(result.get("model_input_nodes")) is int and
+            type(result.get("history_nodes")) is int and
+            1 <= result["model_input_nodes"] <= min(64, result.get("history_nodes", 0))
+        )
+        valid_modes = {mode}
+        if mode == "live_full_history_inference":
+            valid_modes.add("live_recent_history_inference")
+        if (result.get("mode") not in valid_modes or
                 result.get("company") != company or result.get("as_of") != as_of or
-                result.get("all_history") is not True or
+                not history_scope_valid or
                 not isinstance(result.get("history_nodes"), int) or
                 result["history_nodes"] < 1):
             raise ValueError("模型返回的历史范围无效")

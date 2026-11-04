@@ -47,7 +47,7 @@ jobs:
         run: |
           npm test
           cd market-simulator
-          python -m unittest test_save_store test_evidence test_financing test_founder test_forecast_workflow test_financing_scenario
+          python -m unittest test_save_store test_evidence test_financing test_founder test_forecast_workflow test_financing_scenario test_model_forecast
       - name: Build current frontend and validate Worker
         run: |
           npm run build
@@ -77,7 +77,8 @@ jobs:
         run: |
           docker run -d --name escp-ci --memory=6g --cpus=1 -p 127.0.0.1:8080:8080 -e COOKIE_SECURE=0 escp-ci:${{ github.sha }}
           python scripts/smoke_test.py http://127.0.0.1:8080 --storage sqlite
-          docker exec escp-ci python -c "import pathlib,sys; sys.path.insert(0,'/app/scripts'); from live_model_worker import Worker; w=Worker(); w.lookup.warm(); v=w.lookup.encoder.encode(['企业完成一轮融资']); assert v.shape[0]==1; print('PASS: event model and FinBERT loaded on CPU')"
+          docker exec escp-ci python -m unittest test_hotpp_website -q
+          docker exec escp-ci python -c "import json,pathlib,sys; sys.path.insert(0,'/app/scripts'); from hotpp_website.live_worker import HotPPWorker; u=json.loads(pathlib.Path('/app/market-simulator/runtime/universe-v3.json').read_text()); w=HotPPWorker(); w.extend_histories(u['start']); cid=next(c['id'] for c in u['companies'] if c['id'] in w.histories.groups and not c.get('closed')); r=w.run(cid,u['start']); assert r['available'] and len(r['events'])==5 and 1 <= r['model_input_nodes'] <= 64; print('PASS: event prediction on CPU')"
       - name: Stop test container
         if: always()
         run: |

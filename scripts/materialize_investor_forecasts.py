@@ -13,7 +13,7 @@ sys.path.insert(0, str(MARKET))
 sys.path.insert(0, str(REPO / "scripts"))
 
 from forecast_catalog import ForecastCatalog  # noqa: E402
-from live_model_worker import Worker  # noqa: E402
+from hotpp_website.live_worker import HotPPWorker as Worker  # noqa: E402
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     universe = json.loads((MARKET / "runtime/universe-v3.json").read_text())
     cutoff = universe["start"]
     catalog = ForecastCatalog(
-        MARKET / "runtime" / f"investor-forecast-catalog-{cutoff}.json", cutoff)
+        MARKET / "runtime" / f"investor-forecast-catalog-hotpp-{cutoff}.json", cutoff)
     worker = Worker()
     worker.extend_histories(cutoff)
     eligible = set(worker.histories.groups)
