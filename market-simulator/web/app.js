@@ -1,7 +1,7 @@
 'use strict';
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let game=null,view='discover',discoverMode='future',accountMode='portfolio',companyFilter='all',filter='current',pageIndex=0,selected=null,busy=false,timer;
+let game=null,view='discover',discoverMode='recommendations',accountMode='portfolio',companyFilter='all',filter='current',pageIndex=0,selected=null,busy=false,timer;
 const PAGE_SIZE=30;
 const money=(n,currency=game?.currency||'CNY')=>n===null||n===undefined?'未披露':(currency==='CNY'?'¥':'$')+Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
 const short=(n,currency)=>n===null||n===undefined?'未披露':(currency==='CNY'?'¥':'$')+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n.toFixed(2));
@@ -35,8 +35,9 @@ function drawPath(values,width=260,height=70){
 }
 function render(){
   if(!game)return;
+  if(!game.investor?.id){welcome();return;}
   $('#loading').hidden=true;$('#welcome').hidden=true;$('#game').hidden=false;
-  $('#fundName').textContent=game.name;$('#date').textContent=game.as_of;
+  $('#fundName').textContent=game.investor?.name||game.name;$('#date').textContent=game.as_of;
   $('#currencyLabel').textContent=game.currency==='CNY'?'人民币账户':'美元账户';
   $('#advance').disabled=busy||game.ended;$('#advance').textContent=game.ended?'已到资料区间末':'查看下月资料 →';
   const current=game.curve.at(-1);
@@ -144,7 +145,7 @@ function rules(){
   $('#rulesBody').innerHTML='<p><b>资料范围</b><br>读取123,998条融资事件ID记录和628,084条清洗事件。融资以 invested_company_id_anon 连接被投企业，不误用投资人侧 company_id_anon。仅从2019年末已知企业中选取最近披露的120家。</p><p><b>信息时点</b><br>有效披露日与事件日取较晚者；披露日缺失时采用事件日并标注，因此只是近似历史信息回放，并非严格点时数据库。未来融资与风险记录不下发至浏览器。</p><p><b>金额与估值</b><br>按企业、日期、轮次归并候选融资；同日同轮也可能存在不同交易，不能保证完美去重。金额冲突、模糊表述或币种不明时不配置。人民币与美元独立记账，不推测汇率。披露估值的投前/投后口径未明确，不自动用作价格。</p><p><b>假设配置</b><br>只允许当前观察月份披露、金额可核验的同币种股权融资。认购额不超过整轮融资额，视作替代其中一部分参与资金，历史融资总额不增加。可选投后估值由账户使用者自行设定，只用于本笔认购时的比例演示。</p><p><b>组合口径</b><br>现金 + 累计配置成本 − 未付管理费＝成本口径净资产，不是公允价值或投资绩效。未获得完整资本结构和退出对价前，不计算当前持股、自动稀释、退出回款或破产减记。不能将长期无融资等同于失败。</p><p><b>费用与记录</b><br>年管理费率由建立账户时设定，按初始资金逐月计提；现金不足的部分列为应付费用并扣减净资产。原始数据不修改，账户按操作自动保存。此工具不代表真实交易平台。</p>';
   $('#rulesDialog').showModal();
 }
-function welcome(){$('#game').hidden=true;$('#welcome').hidden=false;$('#resume').hidden=!game;$('#loading').hidden=true}
+function welcome(){$('#game').hidden=true;$('#welcome').hidden=false;$('#resume').hidden=!game?.investor?.id;$('#loading').hidden=true;window.InvestorIdentity?.prepareEntry()}
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b||b.disabled)return;
   if(b.hasAttribute('data-close')){b.closest('dialog').close();return}
@@ -178,20 +179,12 @@ document.addEventListener('change',e=>{if(e.target.id==='roundSelect')updateQuot
 $('#search').oninput=()=>{pageIndex=0;renderMarket()};
 $('#prevPage').onclick=()=>{pageIndex--;renderMarket()};$('#nextPage').onclick=()=>{pageIndex++;renderMarket()};
 $('#advance').onclick=requestAdvance;$('#rulesBtn').onclick=rules;$('#newBtn').onclick=welcome;$('#resume').onclick=render;
-$('#newForm').onsubmit=async e=>{
-  e.preventDefault();if(busy)return;busy=true;const b=e.target.querySelector('button[type=submit]');b.disabled=true;
-  try{
-    const f=new FormData(e.target),result=await api('/api/new',{name:f.get('name'),currency:f.get('currency'),initial:Number(f.get('initial')),fee_rate:Number(f.get('fee'))/100});
-    game=result.game;view='discover';discoverMode='future';filter='current';pageIndex=0;selected=null;$('#search').value='';$('#legacyNotice').hidden=true;render();
-  }catch(e){toast(e.message)}
-  finally{busy=false;b.disabled=false;if(game)render()}
-};
+$('#newForm').onsubmit=e=>{e.preventDefault();window.InvestorIdentity?.submitEntry(e)};
 $('#exportBtn').onclick=()=>{
   const blob=new Blob([JSON.stringify(game,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download='historical-allocation.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 api('/api/game').then(result=>{
   game=result.game;$('#legacyNotice').hidden=!result.legacy;
-  $('#sourceSummary').textContent='数据来源：'+result.meta.funding_records.toLocaleString()+' 条融资事件ID记录及 '+result.meta.scanned_events.toLocaleString()+' 条清洗企业事件。仅使用可核验字段；完整口径见工作台说明。';
   if(game)render();else welcome();
 }).catch(e=>{$('#loading').textContent='读取失败：'+e.message});

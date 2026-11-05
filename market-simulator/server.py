@@ -7,7 +7,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse,parse_qs
-from evidence_engine import new_game,apply,public_state,RuleError
+from evidence_engine import new_game,apply,public_state as account_public_state,RuleError
 from save_store import SQLiteSaveStore, DurableSaveStore, SaveConflict, StorageUnavailable
 
 ROOT=Path(__file__).resolve().parent
@@ -25,6 +25,10 @@ for item in UNIVERSE['rounds']:
             industry=item.get('industry') or '未披露',region=item.get('region') or '未披露')
 from institutions import build_index, candidates, pool
 INSTITUTIONS=build_index(UNIVERSE)
+from recommendations import InvestorRecommender, RecommendationUnavailable, investment_subjects
+from data_pipeline import SOURCE
+RECOMMENDER=InvestorRecommender(ROOT/'recommendation-assets'/'sgl', UNIVERSE,
+                              investment_subjects(SOURCE, UNIVERSE['start']))
 from knowledge_graph import KnowledgeGraph
 from model_forecast import ModelForecast, ModelInferenceError, ModelProcessError
 from forecast_catalog import ForecastCatalog
@@ -66,6 +70,19 @@ if REMOTE_SAVES is None:
 
 def saves():
     return REMOTE_SAVES if REMOTE_SAVES is not None else SQLiteSaveStore(DB)
+
+def has_investor(state):
+    iid=state.get('investor_id')
+    return isinstance(iid,str) and iid in RECOMMENDER.subjects
+
+def public_state(state, universe, **kwargs):
+    result=account_public_state(state, universe, **kwargs)
+    if result is not None:
+        iid=state.get('investor_id')
+        result['investor']=(RECOMMENDER.identity(iid) if isinstance(iid,str) and iid in RECOMMENDER.subjects else None)
+        result['investor_id']=result['investor']['id'] if result['investor'] else None
+        result['investor_required']=result['investor'] is None
+    return result
 
 def forecast_error(error, scenario=False):
     """Return a useful public status without exposing internal paths or data."""
@@ -120,6 +137,37 @@ class Handler(BaseHTTPRequestHandler):
         path=urlparse(self.path).path
         if path=='/api/health':
             return self.respond(200,{'ok':True,'service':'venture-simulator','storage':'durable-object' if REMOTE_SAVES is not None else 'sqlite'})
+        if path=='/api/recommendation-investors':
+            query=parse_qs(urlparse(self.path).query)
+            try:return self.respond(200,RECOMMENDER.investors(query.get('q',[''])[0], int(query.get('page',['1'])[0])))
+            except ValueError:return self.respond(400,{'error':'投资方查询条件无效'})
+        if path=='/api/investor-preview':
+            iid=parse_qs(urlparse(self.path).query).get('investor_id',[''])[0]
+            if not iid or len(iid)>200:return self.respond(400,{'error':'请选择投资方'})
+            if iid not in RECOMMENDER.subjects:return self.respond(404,{'error':'投资方不存在'})
+            return self.respond(200,RECOMMENDER.preview(iid))
+        if path in ('/api/forecast-opportunities','/api/tracked-companies'):
+            row=self.saved_row()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            if not has_investor(json.loads(row[0])):
+                return self.respond(403,{'error':'请先选择自己的投资方身份','investor_required':True})
+        if path in ('/api/recommendations','/api/investor-graph'):
+            row=self.saved_row()
+            if not row:return self.respond(401,{'error':'请先建立账户'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:return self.respond(400,{'error':'请建立新版账户'})
+            iid=state.get('investor_id')
+            if not isinstance(iid,str) or iid not in RECOMMENDER.subjects:
+                return self.respond(403,{'error':'请先选择自己的投资方身份','investor_required':True})
+            query=parse_qs(urlparse(self.path).query)
+            if any(value != iid for value in query.get('investor_id', [])):
+                return self.respond(403,{'error':'请先更换投资方身份，再查看对应内容'})
+            try:
+                if path=='/api/investor-graph':return self.respond(200,RECOMMENDER.graph(iid))
+                return self.respond(200,RECOMMENDER.recommend(iid))
+            except ValueError as error:return self.respond(400,{'error':str(error)})
+            except KeyError:return self.respond(404,{'error':'投资方不存在，请从列表选择'})
+            except RecommendationUnavailable as error:return self.respond(503,{'error':str(error)})
         if path=='/api/model-forecast':
             row=self.saved_row()
             if not row:return self.respond(401,{'error':'请先建立账户'})
@@ -304,6 +352,10 @@ class Handler(BaseHTTPRequestHandler):
         files['/knowledge-graph.css']=('knowledge-graph.css','text/css')
         files['/timeline.css']=('timeline.css','text/css')
         files['/forecast-ui.js']=('forecast-ui.js','text/javascript')
+        files['/recommendations.js']=('recommendations.js','text/javascript')
+        files['/recommendations.css']=('recommendations.css','text/css')
+        files['/investor-preview-graph.js']=('investor-preview-graph.js','text/javascript')
+        files['/investor-preview-graph.css']=('investor-preview-graph.css','text/css')
         files.update({'/founder':('founder.html','text/html'),'/founder.js':('founder.js','text/javascript'),'/founder.css':('founder.css','text/css')})
         if path not in files:return self.respond(404,{'error':'Not found'})
         file,mime=files[path];raw=(ROOT/'web'/file).read_bytes()
@@ -321,13 +373,40 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data,dict):raise RuleError('请求格式无效')
             path=urlparse(self.path).path
             if path=='/api/new':
-                name=data.get('name','远航资本')
+                workspace=data.get('workspace','investor')
+                if workspace not in ('investor','founder'):raise RuleError('工作台类型无效')
+                identity=RECOMMENDER.identity(data.get('investor_id')) if workspace=='investor' else None
+                name=identity['name'] if identity else data.get('name','企业工作台')
                 if not isinstance(name,str):raise RuleError('账户名称无效')
                 sid=secrets.token_urlsafe(32);state=new_game(UNIVERSE,name.strip() or '远航资本',
                     data.get('currency','CNY'),data.get('initial',100000000),data.get('fee_rate',0))
+                state['workspace']=workspace
+                if identity:state['investor_id']=identity['id']
                 saves().create(sid,state)
                 return self.respond(200,{'game':public_state(state,UNIVERSE)},sid)
+            if path=='/api/investor':
+                identity=RECOMMENDER.identity(data.get('investor_id'))
+                row=self.saved_row()
+                if not row:return self.respond(401,{'error':'请先建立账户'})
+                state=json.loads(row[0])
+                if state.get('version')!=3:raise RuleError('请先建立新版账户')
+                if data.get('revision')!=state['revision']:
+                    return self.respond(409,{'error':'存档已更新，请刷新后操作','game':public_state(state,UNIVERSE)})
+                if state.get('investor_id')!=identity['id']:
+                    previous_revision=state['revision']
+                    state['investor_id']=identity['id'];state['workspace']='investor'
+                    state['revision']+=1
+                    saves().update(self.session(),previous_revision,state)
+                return self.respond(200,{'game':public_state(state,UNIVERSE)})
             if path!='/api/action':return self.respond(404,{'error':'Not found'})
+            row=self.saved_row()
+            if not row:return self.respond(404,{'error':'请先创建基金'})
+            state=json.loads(row[0])
+            if state.get('version')!=3:raise RuleError('旧账户已归档，请建立前向模拟账户')
+            if data.get('type') in ('offer','invest','advance','forecast_watch','forecast_followup') and not has_investor(state):
+                return self.respond(403,{'error':'请先选择自己的投资方身份','investor_required':True})
+            if data.get('revision')!=state['revision']:
+                return self.respond(409,{'error':'存档已更新，请刷新后操作','game':action_state(state)})
             offer_forecast=None
             if data.get('type')=='offer':
                 company=data.get('company')
@@ -338,12 +417,6 @@ class Handler(BaseHTTPRequestHandler):
                         return self.respond(503,{'error':str(error)})
                     except (KeyError,RuntimeError,TimeoutError,ValueError):
                         offer_forecast=None
-            row=self.saved_row()
-            if not row:return self.respond(404,{'error':'请先创建基金'})
-            state=json.loads(row[0])
-            if state.get('version')!=3:raise RuleError('旧账户已归档，请建立前向模拟账户')
-            if data.get('revision')!=state['revision']:
-                return self.respond(409,{'error':'存档已更新，请刷新后操作','game':action_state(state)})
             if isinstance(data.get('type'),str) and data['type'].startswith('financing_'):
                 from financing import transact
                 state=transact(state,data,UNIVERSE,INSTITUTIONS)

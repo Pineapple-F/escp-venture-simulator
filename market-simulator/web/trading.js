@@ -1,10 +1,6 @@
 'use strict';
 filter='all';
-$('.intro').textContent='预测企业未来事件，建立投资组合并持续推进。';
-$('.start-brief').innerHTML='<h2>从发现到跟踪</h2><p>筛选企业、查看发展路径、记录投资，并观察组合随企业发展而变化。</p>';
-$('.landing-stats').innerHTML='<div><b>含无融资记录企业</b><span>不将缺失记录视为未融资</span></div><div><b>2026—2029</b><span>前向模拟</span></div>';
 $('#legacyNotice').innerHTML='旧版账户已保留。<a href="/api/legacy-export" download="historical-account.json">下载旧记录</a>，或新建前向模拟账户。';
-$('#newForm>.tour-note').textContent='人民币与美元账户分别记账；每月推进企业事件与组合变化。';
 $('.timeline>span:first-child').textContent='2026-03';$('.timeline>b').textContent='2029-03';
 $('#regime').textContent='模拟日期';
 $('#endBanner').textContent='三年模拟结束，可查看持仓并导出账户。';

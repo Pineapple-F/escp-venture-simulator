@@ -40,7 +40,8 @@ def main():
                 browser = p.chromium.launch(channel=args.channel, headless=True)
                 context = browser.new_context(viewport={'width': 1440, 'height': 1000})
                 assert context.request.get(base + '/api/knowledge-graph?entity_type=company&entity_id=missing').status == 401
-                created = context.request.post(base + '/api/new', data={'name': '图谱测试账户'})
+                investor = next(row for row in server.RECOMMENDER.investor_rows if row['trained'])
+                created = context.request.post(base + '/api/new', data={'name': '图谱测试账户', 'investor_id': investor['id']})
                 assert created.ok
                 assert context.request.get(base + '/api/knowledge-graph?entity_type=company&entity_id=missing').status == 404
                 assert context.request.get(base + '/api/knowledge-graph?entity_type=invalid&entity_id=x').status == 400

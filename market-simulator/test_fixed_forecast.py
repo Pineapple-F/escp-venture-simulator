@@ -12,7 +12,8 @@ class FixedForecastRouteTest(unittest.TestCase):
         self.row = server.FORECAST_CATALOG.get(self.company)
         self.handler = server.Handler.__new__(server.Handler)
         self.handler.saved_row = Mock(return_value=(json.dumps({
-            'version': 3, 'currency': 'CNY', 'founder_custom': {
+            'version': 3, 'revision': 0, 'currency': 'CNY',
+            'investor_id': next(iter(server.RECOMMENDER.subjects)), 'founder_custom': {
                 'profile': {'name': 'Test'}, 'events': [{'type': 1}],
             },
         }),))
@@ -57,7 +58,7 @@ class FixedForecastRouteTest(unittest.TestCase):
         compute.assert_called_once_with(self.company, scenario['events'], scenario['as_of'])
 
     def test_offer_with_missing_catalog_does_not_run_model(self):
-        body = json.dumps({'type': 'offer', 'company': self.company}).encode()
+        body = json.dumps({'type': 'offer', 'company': self.company, 'revision': 0}).encode()
         self.handler.path = '/api/action'
         self.handler.headers = {'Content-Length': str(len(body))}
         self.handler.rfile = io.BytesIO(body)

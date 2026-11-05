@@ -8,7 +8,9 @@ with sync_playwright() as p:
     b=p.chromium.launch(executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless=True)
     page=b.new_page(viewport={'width':1440,'height':1000});errors=[]
     page.on('pageerror',lambda e:errors.append(str(e)))
-    page.goto('http://127.0.0.1:8790');page.locator('#newForm button[type=submit]').click()
+    page.goto('http://127.0.0.1:8790')
+    page.locator('#identityResults [data-investor-choice]').first.click()
+    page.locator('#enterInvestor').click()
     expect(page.locator('#game')).to_be_visible(timeout=30000)
     state=page.request.get('http://127.0.0.1:8790/api/game').json()['game']
     assert isinstance(state['companies'][0]['history'],dict)

@@ -530,6 +530,6 @@ $('#export').onclick=()=>{
   const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='融资方案.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
-async function begin(mode,button){button.disabled=true;try{const r=await api('/api/new',{name:'企业工作台'});account=r.game;enter();if(mode==='custom')await openCustom(true);else await openDataset(true);}catch(error){status(error.message);}finally{button.disabled=false;}}
+async function begin(mode,button){button.disabled=true;try{const r=await api('/api/new',{name:'企业工作台',workspace:'founder'});account=r.game;enter();if(mode==='custom')await openCustom(true);else await openDataset(true);}catch(error){status(error.message);}finally{button.disabled=false;}}
 $('#start').onclick=()=>begin('dataset',$('#start'));$('#buildOwn').onclick=()=>begin('custom',$('#buildOwn'));
 (async()=>{try{const r=await api('/api/game');account=r.game;if(account){enter();if(account.founder_mode==='custom')await openCustom(false);else if(account.founder_company)await selectCompany(account.founder_company);else await openDataset(false);}else{$('#entry').hidden=false;status(r.legacy?'旧账户将保留，进入企业端会创建独立新版工作台。':'');}}catch(e){status(e.message);}})();

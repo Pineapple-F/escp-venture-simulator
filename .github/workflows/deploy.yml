@@ -42,12 +42,12 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      - run: python -m pip install duckdb==1.5.5
+      - run: python -m pip install duckdb==1.5.5 'numpy>=2.0,<3'
       - name: Test storage and business logic
         run: |
           npm test
           cd market-simulator
-          python -m unittest test_save_store test_evidence test_financing test_founder test_forecast_workflow test_financing_scenario test_model_forecast
+          python -m unittest test_save_store test_evidence test_financing test_founder test_forecast_workflow test_financing_scenario test_model_forecast test_fixed_forecast test_recommendations test_investor_identity
       - name: Build current frontend and validate Worker
         run: |
           npm run build

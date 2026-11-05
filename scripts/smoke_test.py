@@ -35,15 +35,35 @@ def main():
             if attempt == args.attempts-1: raise
             print(f'Waiting for container provisioning ({attempt+1}/{args.attempts}): {type(error).__name__}', flush=True)
             time.sleep(10)
-    for path in ('/', '/founder', '/app.js', '/founder.js'):
+    for path in ('/', '/founder', '/app.js', '/founder.js', '/recommendations.js', '/recommendations.css',
+                 '/investor-preview-graph.js', '/investor-preview-graph.css'):
         status, body = request(path)
         assert status == 200 and len(body)>100, path
     _, raw = request('/api/game')
     assert json.loads(raw)['game'] is None
     if not args.read_only:
-        # One test save per deployment, identified by name; no investment action.
-        _, raw = request('/api/new', {'name':'Deployment smoke test','currency':'CNY'})
+        # One isolated test save per deployment; no investment action.
+        _, raw = request('/api/recommendation-investors')
+        subjects = json.loads(raw)
+        assert subjects['items'], 'No investment subjects loaded'
+        subject = subjects['items'][0]
+        _, raw = request('/api/investor-preview?investor_id=' + subject['id'])
+        preview = json.loads(raw)
+        assert preview['investor']['id'] == subject['id']
+        assert preview['graph']['root_id'] == 'institution:' + subject['id']
+        _, raw = request('/api/game')
+        assert json.loads(raw)['game'] is None, 'Preview created an account'
+        _, raw = request('/api/new', {'name':'Deployment smoke test','currency':'CNY', 'investor_id':subject['id']})
         game = json.loads(raw)['game']
+        recommendation_started = time.monotonic()
+        _, raw = request('/api/recommendations')
+        recommendations = json.loads(raw)
+        assert recommendations['method'] == ('sgl' if subject['trained'] else 'mostpop')
+        assert recommendations['count'] == 10
+        assert len({item['id'] for item in recommendations['items']}) == 10
+        assert time.monotonic() - recommendation_started < 10, 'Recommendation took over 10 seconds'
+        _, raw = request('/api/investor-graph')
+        assert json.loads(raw)['root_id'] == 'institution:' + subject['id']
         revision = game['revision']
         _, raw = request('/api/action', {'type':'advance','revision':revision})
         assert json.loads(raw)['game']['revision'] == revision+1
