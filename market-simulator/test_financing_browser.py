@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import unittest
+    raise unittest.SkipTest("Standalone browser check; run directly with a test server")
+
 from playwright.sync_api import sync_playwright,expect
 url='http://127.0.0.1:8790'
 with sync_playwright() as p:

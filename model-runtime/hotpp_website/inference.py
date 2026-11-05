@@ -1,6 +1,7 @@
 """Website adapter for a validated, exported HotPP candidate-set predictor."""
 import numpy as np
 import torch
+from datetime import date, timedelta
 
 QUERY_LABEL = 29
 TARGET_FIRST = 30
@@ -17,14 +18,18 @@ class Predictor:
         if len(self.clock) != 5 or not all(np.isfinite(v['scale']) and np.isfinite(v['offset']) for v in self.clock):
             raise ValueError('invalid time calibration')
 
-    def predict(self, sample):
+    def predict(self, sample, as_of):
         # The model was trained on event types present in history_events.parquet;
         # separately added financial statements were not part of that training.
         types = np.asarray(sample['typ'], dtype=np.int64)
         cont = np.asarray(sample['cont'], dtype=np.float32)
         keep = (types >= 1) & (types <= 25)
-        types = types[keep][-MAX_HISTORY:]
-        cont = cont[keep][-MAX_HISTORY:]
+        types, cont = types[keep], cont[keep]
+        # Scenario events can precede some observed events. Sort all supported
+        # events before applying the history limit so neither ordering nor the
+        # retained most recent events depends on how the paths were combined.
+        order = np.argsort(-cont[:, 0], kind='stable')[-MAX_HISTORY:]
+        types, cont = types[order], cont[order]
         if not len(types):
             raise ValueError('no supported past events')
         age_days = np.rint(np.expm1(cont[:, 0].astype(np.float64) * 8) * 30.4375).astype(np.int64)
@@ -42,8 +47,13 @@ class Predictor:
             scores, index = weighted.max(dim=0)
             offsets = predicted_time[0].gather(0, index) - query_time
         scores = scores.numpy()
-        # Website months are discrete calendar months following the cutoff.
-        days = np.array([np.clip(value * spec['scale'] + spec['offset'], 1/365.25, 1)
-                         for value, spec in zip(offsets.numpy(), self.clock)])
-        months = np.clip(np.ceil(days * 12), 1, 12).astype(np.int64)
+        # Map the predicted day to its actual calendar month. Equal 1/12-year
+        # bins shift dates such as May 31 into June after a March 31 cutoff.
+        cutoff = date.fromisoformat(as_of)
+        years = [np.clip(value * spec['scale'] + spec['offset'], 1/365.25, 1)
+                 for value, spec in zip(offsets.numpy(), self.clock)]
+        predicted_dates = [cutoff + timedelta(days=max(1, int(np.rint(year * 365.25))))
+                           for year in years]
+        months = np.array([max(0, min(12, (day.year - cutoff.year) * 12 + day.month - cutoff.month))
+                           for day in predicted_dates], dtype=np.int64)
         return scores, months, n - 1

@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import unittest
+    raise unittest.SkipTest("Standalone browser check; run directly with a test server")
+
 from playwright.sync_api import sync_playwright,expect
 
 with sync_playwright() as p:
@@ -5,7 +9,7 @@ with sync_playwright() as p:
     page=b.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     page.goto('http://127.0.0.1:8790/founder');page.locator('#start').click()
     expect(page.locator('.result').first).to_be_visible(timeout=30000)
-    page.locator('.result').first.click();page.locator('[data-section=past]').click()
+    page.locator('.result').first.click();page.locator('[data-section=profile]').click()
     expect(page.locator('#pastFunding')).not_to_be_empty()
     rows=[dict(id=str(i),date=f'202{i}-01-01',available=f'202{i}-01-01',stage='A轮',amount=a,currency=c) for i,(a,c) in enumerate([(10,'CNY'),(None,'CNY'),(20,'CNY'),(30,'USD')])]
     page.evaluate('(rows)=>document.querySelector("#pastFunding").innerHTML=fundingVisual(rows)',rows)

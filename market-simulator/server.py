@@ -33,11 +33,23 @@ from profiles import profile
 KNOWLEDGE_GRAPH=KnowledgeGraph(UNIVERSE,INSTITUTIONS,profile_loader=profile)
 MODEL_FORECAST=ModelForecast(
     ROOT.parent/'scripts/live_hotpp_worker.py',UNIVERSE['companies'],UNIVERSE['start'])
-if os.environ.get('MODEL_WARM_ON_START','1') == '1':
+if os.environ.get('MODEL_WARM_ON_START','0') == '1':
     MODEL_FORECAST.warm()
 FORECAST_CATALOG=ForecastCatalog(
     RUNTIME/f'investor-forecast-catalog-hotpp-{UNIVERSE["start"]}.json',UNIVERSE['start'])
 FINANCIAL_PROJECTION=FinancialProjection(UNIVERSE)
+
+class FixedForecastUnavailable(RuntimeError):
+    """The versioned, precomputed forecast is missing or incomplete."""
+
+def fixed_forecast(company):
+    if company not in COMPANY_META:
+        raise KeyError(company)
+    result=FORECAST_CATALOG.get(company)
+    if not isinstance(result,dict) or not result.get('available') or 'history_years' not in result:
+        raise FixedForecastUnavailable('预计算预测暂不可用，请稍后重试。')
+    return result
+
 from collections import defaultdict
 from statistics import median
 # One latest disclosed observation per peer company, same industry/stage/currency.
@@ -116,14 +128,11 @@ class Handler(BaseHTTPRequestHandler):
             company=parse_qs(urlparse(self.path).query).get('id',[''])[0]
             if not company or len(company)>200:return self.respond(400,{'error':'企业标识无效'})
             try:
-                result=FORECAST_CATALOG.get(company)
-                if result is None or 'history_years' not in result:
-                    result=MODEL_FORECAST.get(company)
-                    FORECAST_CATALOG.record(result)
-                result=dict(result)
+                result=dict(fixed_forecast(company))
                 result['financial_projection']=FINANCIAL_PROJECTION.project(company,result,state['currency'])
                 return self.respond(200,result)
             except KeyError:return self.respond(404,{'error':'企业不存在'})
+            except FixedForecastUnavailable as error:return self.respond(503,{'error':str(error)})
             except (RuntimeError,TimeoutError,ValueError) as error:
                 import traceback
                 traceback.print_exc()
@@ -140,13 +149,11 @@ class Handler(BaseHTTPRequestHandler):
             if not scenario['ready']:
                 return self.respond(200,scenario)
             try:
-                baseline=FORECAST_CATALOG.get(company)
-                if baseline is None:
-                    baseline=MODEL_FORECAST.get(company)
-                    FORECAST_CATALOG.record(baseline)
+                baseline=fixed_forecast(company)
                 updated=MODEL_FORECAST.get_scenario(company,scenario['events'],scenario['as_of'])
                 return self.respond(200,{**scenario,'baseline':baseline,'forecast':updated})
             except KeyError:return self.respond(404,{'error':'企业不存在'})
+            except FixedForecastUnavailable as error:return self.respond(503,{'error':str(error)})
             except (RuntimeError,TimeoutError,ValueError) as error:
                 import traceback
                 traceback.print_exc()
@@ -326,10 +333,9 @@ class Handler(BaseHTTPRequestHandler):
                 company=data.get('company')
                 if isinstance(company,str):
                     try:
-                        offer_forecast=FORECAST_CATALOG.get(company)
-                        if offer_forecast is None or 'history_years' not in offer_forecast:
-                            offer_forecast=MODEL_FORECAST.get(company)
-                            FORECAST_CATALOG.record(offer_forecast)
+                        offer_forecast=fixed_forecast(company)
+                    except FixedForecastUnavailable as error:
+                        return self.respond(503,{'error':str(error)})
                     except (KeyError,RuntimeError,TimeoutError,ValueError):
                         offer_forecast=None
             row=self.saved_row()

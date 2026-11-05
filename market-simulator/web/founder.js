@@ -347,14 +347,14 @@ function renderFinancingScenario(result){
   }
   const selected=result.institutions||[],plan=result.plan||{};
   scenarioReady=true;renderActionSnapshot();
-  $('#scenarioStatus').innerHTML='<b>未来一年路径已更新</b><p>'+esc(forecast.horizon_start)+' — '+esc(forecast.horizon_end)+' · 已读取 '+Number(forecast.history_nodes||0).toLocaleString('zh-CN')+' 条历史与融资情景事件</p>';
+  $('#scenarioStatus').innerHTML='<b>未来一年路径已更新</b><p>'+esc(forecast.horizon_start)+' — '+esc(forecast.horizon_end)+' · 预测参考 '+Number(forecast.model_input_nodes??forecast.history_nodes??0).toLocaleString('zh-CN')+' 条事件（历史及融资情景共 '+Number(forecast.history_nodes||0).toLocaleString('zh-CN')+' 条）</p>';
   $('#scenarioInputs').innerHTML='<section class="scenario-inputs"><div><small>融资准备</small><b>目标 '+esc(money(plan.target,plan.currency))+'</b><p>投前估值 '+esc(money(plan.pre_money,plan.currency))+' · '+esc(plan.purpose)+'</p></div><div><small>选择机构</small><b>'+selected.length+' 家机构加入本次路径</b><p>'+esc(selected.map(item=>item.name).join('、'))+'</p></div></section>';
   const original=new Set((baseline.events||[]).filter(item=>item.predicted).map(item=>item.event));
   const updated=new Set((forecast.events||[]).filter(item=>item.predicted).map(item=>item.event));
   const added=[...updated].filter(item=>!original.has(item)),kept=[...updated].filter(item=>original.has(item)),removed=[...original].filter(item=>!updated.has(item));
   $('#scenarioComparison').innerHTML='<details class="path-changes"><summary>查看相对原路径的变化</summary><section class="scenario-comparison"><div class="added"><small>新增事件</small>'+scenarioNames(added)+'</div><div><small>保持不变</small>'+scenarioNames(kept)+'</div><div class="removed"><small>不再出现</small>'+scenarioNames(removed)+'</div></section></details>';
   const future=(forecast.events||[]).filter(item=>item.predicted).sort((a,b)=>a.month_index-b.month_index);
-  $('#scenarioPath').innerHTML='<section class="scenario-path"><div class="scenario-path-title"><div><p class="eyebrow">新的未来一年</p><h3>企业发展路径</h3></div><b>'+future.length+' 个预测事件</b></div>'+(future.length?'<ol>'+future.map((item,index)=>'<li><i>'+(index+1)+'</i><time>'+esc(item.estimated_month)+'</time><strong>'+esc(item.event)+'</strong><small>预计第 '+item.month_index+' 个月发生</small></li>').join('')+'</ol>':'<div class="scenario-empty"><b>未来一年暂无预测事件</b></div>')+'<div class="scenario-decision"><button type="button" data-adopt-scenario>采用该方案，开始融资 →</button><button type="button" class="secondary" data-scenario-go="plan">返回调整方案</button></div></section>';
+  $('#scenarioPath').innerHTML='<section class="scenario-path"><div class="scenario-path-title"><div><p class="eyebrow">新的未来一年</p><h3>企业发展路径</h3></div><b>'+future.length+' 个预测事件</b></div>'+(future.length?'<ol>'+future.map((item,index)=>'<li><i>'+(index+1)+'</i><time>'+esc(item.estimated_month)+'</time><strong>'+esc(item.event)+'</strong><small>'+(item.month_index===0?'预计本月发生':'预计第 '+item.month_index+' 个月发生')+'</small></li>').join('')+'</ol>':'<div class="scenario-empty"><b>未来一年暂无预测事件</b></div>')+'<div class="scenario-decision"><button type="button" data-adopt-scenario>采用该方案，开始融资 →</button><button type="button" class="secondary" data-scenario-go="plan">返回调整方案</button></div></section>';
 }
 async function loadFinancingScenario(force=false){
   if(!company)return;

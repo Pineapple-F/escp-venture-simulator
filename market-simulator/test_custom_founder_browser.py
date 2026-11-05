@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import unittest
+    raise unittest.SkipTest("Standalone browser check; run directly with a test server")
+
 from playwright.sync_api import sync_playwright, expect
 
 

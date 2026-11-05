@@ -151,12 +151,13 @@ class ModelForecast:
         if (not isinstance(events, list) or len(events) != len(EXPECTED_EVENTS) or
                 [item.get("event") for item in events] != list(EXPECTED_EVENTS)):
             raise ValueError("模型返回的事件定义无效")
+        minimum_month = 0 if mode in {"custom_path_inference", "financing_scenario_inference"} else 1
         for item in events:
             predicted = item.get("predicted")
             month = item.get("month_index")
             estimate = item.get("estimated_month")
             if (type(predicted) is not bool or
-                    (predicted and (type(month) is not int or not 1 <= month <= 12 or
+                    (predicted and (type(month) is not int or not minimum_month <= month <= 12 or
                                     not isinstance(estimate, str))) or
                     (not predicted and (month is not None or estimate is not None))):
                 raise ValueError("模型返回的事件结果无效")

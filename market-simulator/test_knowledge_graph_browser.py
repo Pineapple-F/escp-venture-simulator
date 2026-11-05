@@ -12,11 +12,9 @@ import threading
 from contextlib import closing
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright, expect
-import server
-
-
 def main():
+    from playwright.sync_api import sync_playwright, expect
+    import server
     parser = argparse.ArgumentParser()
     parser.add_argument('--channel', default='msedge' if sys.platform == 'win32' else None)
     parser.add_argument('--output', type=Path)

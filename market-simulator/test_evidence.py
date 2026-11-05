@@ -7,7 +7,7 @@ from engine import terms
 
 class EvidenceTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):cls.u=json.loads(Path('runtime/universe-v3.json').read_text())
+    def setUpClass(cls):cls.u=json.loads((Path(__file__).parent / 'runtime/universe-v3.json').read_text())
     def test_missing_is_unknown(self):
         t=terms({'currency':'USD'},[])
         self.assertIsNone(t['target']);self.assertIsNone(t['pre_money']);self.assertIsNone(t['reference'])

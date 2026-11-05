@@ -104,6 +104,11 @@ class ModelForecastTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             FakeForecast(response=result).get('co_a')
 
+    def test_custom_prediction_can_be_in_current_calendar_month(self):
+        result = custom_result()
+        result['events'][0].update(month_index=0, estimated_month='2026-09')
+        ModelForecast._validate(result, result['company'], result['as_of'], mode='custom_path_inference')
+
     def test_warm_starts_available_worker(self):
         forecast = FakeForecast()
         started = []
