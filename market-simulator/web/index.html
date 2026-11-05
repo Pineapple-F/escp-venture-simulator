@@ -48,7 +48,7 @@
     <div class="investor-identity-bar"><div><span>当前投资方</span><strong id="currentInvestorName"></strong><small id="currentInvestorId"></small></div><button id="changeInvestor" type="button">更换投资方</button></div><p class="workspace-note">发现企业 → 分析发展路径 → 记录判断 → 投资与跟踪</p>
     <div id="endBanner" hidden>已完成全部历史月份，可继续查看组合并导出记录。</div>
     <div class="main-grid"><main>
-      <nav id="discoverTabs" class="workflow-tabs" aria-label="发现企业方式"><button data-discover="recommendations" class="active">为我推荐与我的图谱</button><button data-discover="future">未来事件线索</button><button data-discover="history">历史融资记录</button></nav>
+      <nav id="discoverTabs" class="workflow-tabs" aria-label="发现企业方式"><button data-discover="recommendations" class="active">知识图谱</button><button data-discover="future">未来事件线索</button><button data-discover="history">历史融资记录</button></nav>
       <section id="companiesView" hidden><div class="section-heading"><div><p class="eyebrow">关注、跟进与投资</p><h1>我的企业</h1></div></div><div class="workflow-tabs"><button data-company-filter="all" class="active">全部</button><button data-company-filter="watched">已关注</button><button data-company-filter="invested">已投资</button></div><div id="myCompanyRows"></div></section>
       <nav id="accountTabs" class="workflow-tabs" aria-label="投资账户内容" hidden><button data-account="portfolio" class="active">组合与资金</button><button data-account="journal">账户记录</button></nav>
       <section id="marketView"><div class="section-heading"><div><p class="eyebrow">历史融资记录</p><h1>融资市场</h1></div><span id="marketCount"></span></div>
@@ -65,11 +65,7 @@
         <div id="signalSummary" class="signal-summary"></div><div id="signalRows" class="signal-list"></div><div class="pagination"><span id="signalPage"></span><button id="signalPrev">上一页</button><button id="signalNext">下一页</button></div>
         <p class="table-note">机会池展示已完成预测的企业。</p>
       </section>
-      <section id="recommendationsView" aria-labelledby="recommendationTitle" hidden>
-        <div class="section-heading"><div><p class="eyebrow">根据当前投资方历史自动推荐</p><h1 id="recommendationTitle">为我推荐</h1></div><span>10 家未投企业</span></div>
-        <div id="recommendationSummary" class="recommendation-summary" aria-live="polite" hidden></div>
-        <p id="recommendationStatus" class="recommendation-status" role="status">正在读取推荐…</p>
-        <button id="recommendationRetry" type="button" hidden>重新加载推荐</button>
+      <section id="recommendationsView" aria-label="投资方知识图谱" hidden>
         <section class="own-graph-section" aria-labelledby="ownGraphTitle">
           <div class="section-heading"><div><p class="eyebrow">历史投资关系</p><h2 id="ownGraphTitle">我的知识图谱</h2></div><span id="ownGraphCount"></span></div>
           <p id="ownGraphStatus" class="recommendation-status" role="status">正在读取图谱…</p><button id="ownGraphRetry" type="button" hidden>重新加载图谱</button>
@@ -78,13 +74,16 @@
           <div id="ownInvestorGraph" class="own-graph-canvas" aria-label="我的投资关系图"></div>
           <div id="ownGraphDetail" class="own-graph-detail" aria-live="polite" hidden></div><p id="ownGraphNotes" class="table-note"></p>
         </section>
-        <ol id="recommendationRows" class="recommendation-list" aria-label="推荐企业排名"></ol>
       </section>
       <section id="portfolioView" hidden><div class="section-heading"><div><p class="eyebrow">持仓成本 / 预测价值 / 月度变化</p><h1>投资组合</h1></div></div>
         <div class="performance"><header><b>资金构成</b><span>实线：可用现金　虚线：累计配置成本</span></header><div id="chart"></div><p>投资组合与资金变化。</p></div><div id="positions"></div>
       </section>
       <section id="journalView" hidden><div class="section-heading"><h1>账户记录</h1><button id="exportBtn">导出记录 ↓</button></div><div id="journal"></div></section>
-    </main><aside class="inbox"><header><h2>组合动态</h2><span id="taskCount"></span></header><div id="tasks"></div><div class="inbox-guide"><span>当前任务</span><p>查看企业更新与事件跟进。</p></div><header class="dispatch-title"><h2>数据覆盖</h2></header><div id="coverage"></div></aside></div>
+    </main><aside id="recommendationRail" class="recommendation-rail" aria-label="推荐企业" hidden>
+      <p id="recommendationStatus" class="recommendation-status" role="status">正在读取推荐…</p>
+      <button id="recommendationRetry" type="button" hidden>重新加载推荐</button>
+      <ol id="recommendationRows" class="recommendation-list" aria-label="推荐企业排名"></ol>
+    </aside><aside class="inbox"><header><h2>组合动态</h2><span id="taskCount"></span></header><div id="tasks"></div><div class="inbox-guide"><span>当前任务</span><p>查看企业更新与事件跟进。</p></div><header class="dispatch-title"><h2>数据覆盖</h2></header><div id="coverage"></div></aside></div>
     <footer class="timeline"><span>2019-12</span><span id="observationRange"></span><b>2022-12</b></footer>
   </div>
 </div>

@@ -85,3 +85,16 @@
 .investor-identity-bar{display:flex;justify-content:space-between;align-items:center;gap:15px;border-bottom:1px solid var(--line);padding:18px 0}.investor-identity-bar>div{min-width:0;display:grid;gap:4px}.investor-identity-bar span,.investor-identity-bar small{font-size:12px;color:#68786c;overflow-wrap:anywhere}.investor-identity-bar strong{font-size:22px;font-weight:550;overflow-wrap:anywhere}.investor-identity-bar button{flex:none;font-size:14px}#investorSwitchDialog{width:min(780px,94vw)}#investorSwitchDialog h2{margin-bottom:12px}#investorSwitchDialog input{width:100%}#investorSwitchDialog .identity-results{max-height:340px}#confirmInvestorSwitch{width:100%;margin-top:8px}.own-graph-section{margin:26px 0;padding:22px 0;border-block:1px solid var(--line);min-width:0}.own-graph-section .section-heading{margin:0 0 12px}.own-graph-section h2{font-size:23px}.own-graph-canvas{width:100%;max-width:100%;max-height:360px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);background:#f6f8f1;border-radius:5px}.own-graph-canvas svg{display:block;max-width:none}.own-graph-canvas [data-own-graph-node]{cursor:pointer}.own-graph-canvas [data-own-graph-node]:focus rect{stroke-width:3}.own-graph-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin:10px 0;color:#526c91}.own-graph-legend span:nth-child(2){color:#977242}.own-graph-legend span:nth-child(3){color:#277358}.own-graph-detail{padding:16px;background:#e9edde;margin-top:12px;overflow-wrap:anywhere}.own-graph-detail h3{margin-bottom:8px}.own-graph-detail p{font-size:13px;line-height:1.8}.own-graph-detail button{margin-top:10px}.own-graph-section .table-note{margin-top:13px;line-height:1.8}.own-graph-section .recommendation-status{padding:0}
 @media(max-width:650px){.investor-identity-bar{align-items:flex-start}.investor-identity-bar strong{font-size:19px}.investor-identity-bar button{padding:8px 10px}.own-graph-section .section-heading{flex-wrap:wrap;gap:8px}.own-graph-canvas{max-height:310px}}
 .own-graph-scroll-hint{display:none;font-size:12px;color:#637268;margin:8px 0}@media(max-width:650px){.own-graph-scroll-hint{display:block}}
+
+/* Graph at left, a compact company list at right. */
+.main-grid.has-recommendations{grid-template-columns:minmax(0,1fr) minmax(280px,340px)}
+.recommendation-rail{min-width:0;border-left:1px solid var(--line);padding:30px 0 24px 24px}
+.recommendation-rail .recommendation-status:empty{display:none}
+.recommendation-rail .recommendation-card{align-items:flex-start;flex-wrap:wrap;gap:8px 10px;padding:18px 0}
+.recommendation-rail .recommendation-card:first-child{padding-top:0}
+.recommendation-rail .recommendation-rank{flex-basis:22px;font-size:19px}
+.recommendation-rail .recommendation-card>div{flex-basis:calc(100% - 32px)}
+.recommendation-rail .recommendation-card h3{font-size:17px}
+.recommendation-rail .recommendation-card .eyebrow{font-size:11px}
+.recommendation-rail .recommendation-open{margin-left:32px;font-size:12px;padding:6px 10px}
+@media(max-width:900px){.main-grid.has-recommendations{grid-template-columns:minmax(0,1fr)}.recommendation-rail{border-left:0;border-top:1px solid var(--line);padding:24px 0}.recommendation-rail .recommendation-card>div{flex-basis:calc(100% - 32px)}}

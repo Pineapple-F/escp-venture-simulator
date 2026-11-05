@@ -68,7 +68,13 @@ def main():
                     expect(page.locator('#welcome')).to_be_hidden()
                     expect(page.locator('#currentInvestorName')).to_have_text(subject['name'])
                     expect(page.locator('#recommendationsView')).to_be_visible()
-                    expect(page.locator('.recommendation-method')).to_have_text(label)
+                    expect(page.locator('#recommendationRail')).to_be_visible()
+                    expect(page.locator('#recommendationSummary, #recommendationTitle, .recommendation-method')).to_have_count(0)
+                    expect(page.locator('.inbox')).to_be_hidden()
+                    if page.viewport_size['width'] > 900:
+                        graph_box = page.locator('#recommendationsView').bounding_box()
+                        rail_box = page.locator('#recommendationRail').bounding_box()
+                        assert rail_box['x'] >= graph_box['x'] + graph_box['width']
                     expect(page.locator('#recommendationRows > li')).to_have_count(10)
                     ids = page.locator('[data-recommendation-company]').evaluate_all(
                         '(rows) => rows.map(row => row.dataset.recommendationCompany)')

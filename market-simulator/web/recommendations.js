@@ -202,7 +202,6 @@
 
   function clearDashboard() {
     ++loadTicket; recommendationController?.abort(); graphController?.abort();
-    el('recommendationSummary').hidden = true;
     el('recommendationRows').replaceChildren(); el('ownInvestorGraph').replaceChildren();
     el('recommendationRetry').hidden = el('ownGraphRetry').hidden = true;
     el('ownGraphDetail').hidden = true; el('ownGraphCount').textContent = ''; el('ownGraphNotes').textContent = '';
@@ -218,11 +217,6 @@
     try {
       const data = await read('/api/recommendations', recommendationController);
       if (ticket !== loadTicket || investor !== game?.investor?.id || data.investor.id !== investor) return;
-      const personalized = data.method === 'sgl';
-      el('recommendationSummary').innerHTML = '<header><h2>' + esc(data.investor.name) + '</h2><span class="recommendation-method">' + (personalized ? 'SGL 个性化推荐' : '热门推荐') + '</span></header>' +
-        '<p>' + (personalized ? '根据你的历史投资关系，为尚未投资的企业排序。' : '该投资方尚未进入模型训练集，按企业历史投资热度推荐。') + ' 已排除历史被投企业。</p>' +
-        '<small>' + (personalized && data.model_history_cutoff ? '模型历史截至 ' + esc(data.model_history_cutoff) + ' · ' : '') + '已投资料核对至 ' + esc(data.history_cutoff) + ' · 计算耗时 ' + Number(data.elapsed_ms).toFixed(1) + ' 毫秒</small>';
-      el('recommendationSummary').hidden = false;
       el('recommendationRows').innerHTML = data.items.map((row, index) => '<li class="recommendation-card" data-recommendation-company="' + esc(row.id) + '"><span class="recommendation-rank">' + (index + 1) + '</span><div><p class="eyebrow">' + esc(field(row.industry, '行业未披露')) + ' · ' + esc(field(row.region, '地区未披露')) + '</p><button type="button" class="company-link" data-company="' + esc(row.id) + '"><h3>' + esc(row.name) + '</h3></button><p>融资阶段：' + esc(row.stage || '未披露') + '</p></div><button type="button" class="recommendation-open" data-company="' + esc(row.id) + '">查看企业 →</button></li>').join('');
       el('recommendationStatus').textContent = data.items.length < 10 ? '符合条件的未投企业有 ' + data.items.length + ' 家，已全部展示。' : '';
     } catch (error) {
@@ -294,6 +288,9 @@
     el('fundName').textContent = game.investor.name;
     const visible = view === 'discover' && discoverMode === 'recommendations';
     el('recommendationsView').hidden = !visible;
+    el('recommendationRail').hidden = !visible;
+    document.querySelector('.inbox').hidden = visible;
+    document.querySelector('.main-grid').classList.toggle('has-recommendations', visible);
     if (visible && loadedIdentity !== game.investor.id) { loadedIdentity = game.investor.id; loadDashboard(); }
   };
   window.InvestorIdentity = Object.freeze({prepareEntry, submitEntry});
